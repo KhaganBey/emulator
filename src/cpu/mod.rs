@@ -8,6 +8,8 @@ use self::instructions::Instruction;
 use self::instructions::ArithmeticTarget;
 use self::instructions::ADDHLTarget;
 use self::instructions::IncDecTarget;
+use self::instructions::BitPosition;
+use self::instructions::PrefixTarget;
 
 pub struct CPU { 
     pub registers: Registers,
@@ -630,6 +632,138 @@ impl CPU {
                 self.registers.a = new_value;
                 self.pc.wrapping_add(1)
             }
+            Instruction::BIT(target, bit_position) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.get_hl() as u8;
+                        self.bit_test(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                }
+            }
+            Instruction::SET(target, bit_position) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.get_hl() as u8;
+                        self.bit_set(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                }
+            }
+            Instruction::RES(target, bit_position) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.get_hl() as u8;
+                        self.bit_reset(value, bit_position);
+                        self.pc.wrapping_add(1)
+                    }
+                }
+            }
             //Instruction::
     }
   }
@@ -907,5 +1041,26 @@ impl CPU {
         new_value
     }
 
-    pub fn bit_test(%mut self, value)
+    pub fn bit_test(&mut self, value: u8, bit_pos: BitPosition) {
+        let position : u8 = bit_pos.into();
+        let bit = (value >> position) & 0b1;
+        self.registers.f.zero = bit != 0;
+
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = true;
+    }
+
+    pub fn bit_set(&mut self, value: u8, bit_pos: BitPosition) -> u8 {
+        let position : u8 = bit_pos.into();
+        let new_value = value | (0b00000001 << position);
+
+        new_value
+    }
+
+    pub fn bit_reset(&mut self, value: u8, bit_pos: BitPosition) -> u8 {
+        let position : u8 = bit_pos.into();
+        let new_value = value & !(0b00000001 << position);
+
+        new_value
+    }
 }
