@@ -764,7 +764,58 @@ impl CPU {
                     }
                 }
             }
-            //Instruction::
+            Instruction::SWAP(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.swap(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.swap(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.swap(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.swap(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.swap(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.swap(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.swap(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.swap(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }
+            }
     }
   }
 
@@ -1061,6 +1112,14 @@ impl CPU {
         let position : u8 = bit_pos.into();
         let new_value = value & !(0b00000001 << position);
 
+        new_value
+    }
+
+    pub fn swap(&mut self, value: u8) -> u8 {
+        let upper_nibble = value & 0b11110000;
+        let lower_nibble = value & 0b00001111;
+        
+        let new_value = (upper_nibble >> 4) | (lower_nibble << 4);
         new_value
     }
 }
