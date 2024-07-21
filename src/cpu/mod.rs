@@ -10,10 +10,15 @@ use self::instructions::ADDHLTarget;
 use self::instructions::IncDecTarget;
 use self::instructions::BitPosition;
 use self::instructions::PrefixTarget;
+use self::instructions::JumpTest;
+use self::instructions::LoadType;
+use self::instructions::LoadByteSource;
+use self::instructions::LoadByteTarget;
 
 pub struct CPU { 
     pub registers: Registers,
     pc: u16,
+    sp: u16,
     bus: MemoryBus
 }
 
@@ -25,19 +30,33 @@ impl MemoryBus {
     fn read_byte(&self, adress: u16) -> u8 {
         self.memory[adress as usize]
     }
+
+    fn write_byte(&mut self, adress: u16, byte: u8) {
+        self.memory[adress as usize] = byte;
+    }
 }
 
 impl CPU {
-    fn step(&self) {
+    fn step(&mut self) {
         let mut instruction_byte = self.bus.read_byte(self.pc);
 
-        let next_pc = if let Some(instruction) = Instruction::from_byte(instruction_byte) {
+        let prefixed = instruction_byte == 0xCB;
+        if prefixed {
+            instruction_byte = self.bus.read_byte(self.pc + 1);
+        }
+
+        let next_pc = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
             self.execute(instruction);
         } else {
+            let description = format!("0x{}{:x}", if prefixed { "cb" } else { "" }, instruction_byte);
             panic!("Unkown instruction found for: 0x{:x}", instruction_byte);
         };
 
         self.pc = next_pc;
+    }
+
+    fn read_next_byte(&self) -> u8 {
+        self.bus.read_byte(self.pc + 1)
     }
 
     fn execute(&mut self, instruction: Instruction) -> u16 {
@@ -613,22 +632,22 @@ impl CPU {
                 self.pc.wrapping_add(1)
             }
             Instruction::RRA => {
-                let new_value = self.shift_r_flag(self.registers.a);
+                let new_value = self.rotate_r_flag(self.registers.a);
                 self.registers.a = new_value;
                 self.pc.wrapping_add(1)
             }
             Instruction::RLA => {
-                let new_value = self.shift_l_flag(self.registers.a);
+                let new_value = self.rotate_l_flag(self.registers.a);
                 self.registers.a = new_value;
                 self.pc.wrapping_add(1)
             }
             Instruction::RRCA => {
-                let new_value = self.shift_r(self.registers.a);
+                let new_value = self.rotate_r(self.registers.a);
                 self.registers.a = new_value;
                 self.pc.wrapping_add(1)
             }
             Instruction::RLCA => {
-                let new_value = self.shift_l(self.registers.a);
+                let new_value = self.rotate_l(self.registers.a);
                 self.registers.a = new_value;
                 self.pc.wrapping_add(1)
             }
@@ -813,6 +832,430 @@ impl CPU {
                         let new_value = self.swap(value);
                         self.registers.l = new_value;
                         self.pc.wrapping_add(1)
+                    }
+                }
+            }
+            Instruction::SLA(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.shift_l(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.shift_l(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.shift_l(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.shift_l(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.shift_l(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.shift_l(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.shift_l(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.shift_l(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }   
+            }
+            Instruction::SRA(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.shift_r(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.shift_r(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.shift_r(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.shift_r(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.shift_r(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.shift_r(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.shift_r(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.shift_r(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }   
+            }
+            Instruction::SRL(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.shift_r_logical(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }   
+            }
+            Instruction::RR(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_r_flag(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }   
+            }
+            Instruction::RL(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_l_flag(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }   
+            }
+            Instruction::RRC(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.rotate_r(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.rotate_r(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.rotate_r(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.rotate_r(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.rotate_r(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.rotate_r(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_r(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_r(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }   
+            }
+            Instruction::RLC(target) => {
+                match target {
+                    PrefixTarget::A => {
+                        let value = self.registers.a;
+                        let new_value = self.rotate_l(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::B => {
+                        let value = self.registers.b;
+                        let new_value = self.rotate_l(value);
+                        self.registers.b = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::C => {
+                        let value = self.registers.c;
+                        let new_value = self.rotate_l(value);
+                        self.registers.c = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::D => {
+                        let value = self.registers.d;
+                        let new_value = self.rotate_l(value);
+                        self.registers.d = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::E => {
+                        let value = self.registers.e;
+                        let new_value = self.rotate_l(value);
+                        self.registers.e = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::H => {
+                        let value = self.registers.h;
+                        let new_value = self.rotate_l(value);
+                        self.registers.h = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::L => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_l(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                    PrefixTarget::HL => {
+                        let value = self.registers.l;
+                        let new_value = self.rotate_l(value);
+                        self.registers.l = new_value;
+                        self.pc.wrapping_add(1)
+                    }
+                }   
+            }
+            Instruction::JP(test) => {
+                let jump_condition = match test {
+                    JumpTest::NotZero => !self.registers.f.zero,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::Always => true
+                };
+
+                self.jump(jump_condition)
+            }
+            Instruction::JR(test) => {
+                let jump_condition = match test {
+                    JumpTest::NotZero => !self.registers.f.zero,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::Always => true
+                };
+
+                self.jump_relative(jump_condition)
+            } 
+            Instruction::JPI => {
+                let value = self.registers.get_hl();
+
+                value
+            }
+            Instruction::LD(load_type) => {
+                match load_type {
+                    LoadType::Byte(target, source) => {
+                        let source_value = match source {
+                            LoadByteSource::A => self.registers.a,
+                            LoadByteSource::B => self.registers.b,
+                            LoadByteSource::C => self.registers.c,
+                            LoadByteSource::D => self.registers.d,
+                            LoadByteSource::E => self.registers.e,
+                            LoadByteSource::H => self.registers.h,
+                            LoadByteSource::L => self.registers.l,
+                            LoadByteSource::HL => self.bus.read_byte(self.registers.get_hl()),
+                            LoadByteSource::D8 => self.read_next_byte()
+                        };
+
+                        match target {
+                            LoadByteTarget::A => self.registers.a = source_value,
+                            LoadByteTarget::B => self.registers.b = source_value,
+                            LoadByteTarget::C => self.registers.c = source_value,
+                            LoadByteTarget::D => self.registers.d = source_value,
+                            LoadByteTarget::E => self.registers.e = source_value,
+                            LoadByteTarget::H => self.registers.h = source_value,
+                            LoadByteTarget::L => self.registers.l = source_value,
+                            LoadByteTarget::HL => self.bus.write_byte(self.registers.get_hl(), source_value)
+                        };
+
+                        match source {
+                            LoadByteSource::D8  => self.pc.wrapping_add(2),
+                            _                   => self.pc.wrapping_add(1),
+                          }
                     }
                 }
             }
@@ -1058,36 +1501,90 @@ impl CPU {
         self.registers.f.half_carry = true;
     }
 
-    pub fn shift_r_flag(&mut self, value: u8) -> u8 {
-        let transfer_bit = (self.registers.f.carry as u8) << 7;
-        let new_value = transfer_bit | (value >> 1);
-
-        self.registers.f.carry = (value & 0b1) == 0b1;
-
-        new_value
-    }
-
-    pub fn shift_l_flag(&mut self, value: u8) -> u8 {
-        let transfer_bit = (self.registers.f.carry as u8);
-        let new_value = (value << 1) | transfer_bit;
-
-        self.registers.f.carry = ((value) & 0x80) == 0x80;
-
-        new_value
-    }
-
     pub fn shift_r(&mut self, value: u8) -> u8 {
-        let new_value = value >> 1;
+        let b7 = value & 0b10000000;
+        let b0 = value & 0b00000001;
+        let new_value = b7 | (value >> 1);
 
-        self.registers.f.carry = (value & 0b1) == 0b1;
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = b0 != 0;
 
         new_value
     }
 
     pub fn shift_l(&mut self, value: u8) -> u8 {
+        let b7 = value & 0b10000000;
         let new_value = value << 1;
 
-        self.registers.f.carry = ((value) & 0x80) == 0x80;
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = b7 != 0;
+
+        new_value
+    }
+
+    pub fn shift_r_logical(&mut self, value: u8) -> u8 {
+        let new_value = value >> 1;
+
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = (value & 0b1) == 0b1;
+
+        new_value
+    }
+
+    pub fn rotate_r_flag(&mut self, value: u8) -> u8 {
+        let b0 = value & 0b00000001;
+        let transfer_bit = (self.registers.f.carry as u8) << 7;
+        let new_value = transfer_bit | (value >> 1);
+
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = b0 != 0;
+
+        new_value
+    }
+
+    pub fn rotate_l_flag(&mut self, value: u8) -> u8 {
+        let b7 = value & 0b10000000;
+        let transfer_bit = self.registers.f.carry as u8;
+        let new_value = (value << 1) | transfer_bit;
+
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = b7 != 0;
+
+        new_value
+    }
+
+    pub fn rotate_r(&mut self, value: u8) -> u8 {
+        let b0 = value & 0b00000001;
+        let transfer_bit = b0 << 7;
+        let new_value = transfer_bit | (value >> 1);
+
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = b0 != 0;
+
+        new_value
+    }
+
+    pub fn rotate_l(&mut self, value: u8) -> u8 {
+        let b7 = value & 0b10000000;
+        let transfer_bit = b7 >> 7;
+        let new_value = (value << 1) | transfer_bit;
+
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = b7 != 0;
 
         new_value
     }
@@ -1118,8 +1615,33 @@ impl CPU {
     pub fn swap(&mut self, value: u8) -> u8 {
         let upper_nibble = value & 0b11110000;
         let lower_nibble = value & 0b00001111;
+
+        self.registers.f.zero = value == 0;
+        self.registers.f.subtract = false;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = false;
         
         let new_value = (upper_nibble >> 4) | (lower_nibble << 4);
         new_value
+    }
+
+    pub fn jump(&self, should_jump: bool) -> u16 {
+        if should_jump {
+            let least_significant_byte = self.bus.read_byte(self.pc + 1) as u16;
+            let most_significant_byte = self.bus.read_byte(self.pc + 2) as u16;
+
+            (most_significant_byte << 8) | least_significant_byte
+        } else {
+            self.pc.wrapping_add(3)
+        }
+    }
+
+    pub fn jump_relative(&self, should_jump: bool) -> u16 {
+        if should_jump {
+            let offset = self.bus.read_byte(self.pc + 1) as i8;
+            (self.pc as i8 + offset) as u16
+        } else {
+            self.pc.wrapping_add(3)
+        }
     }
 }
