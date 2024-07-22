@@ -16,6 +16,7 @@ use self::instructions::LoadByteSource;
 use self::instructions::LoadByteTarget;
 use self::instructions::LoadWordTarget;
 use self::instructions::Indirect;
+use self::instructions::StackTarget;
 
 pub struct CPU { 
     pub registers: Registers,
@@ -66,13 +67,32 @@ impl CPU {
     }
 
     fn pop(&mut self) -> u16 {
-        let least_significant_byte = (self.bus.read_byte(self.sp) as u16);
+        let least_significant_byte = self.bus.read_byte(self.sp) as u16;
         self.sp = self.sp.wrapping_add(1);
         
         self.sp = self.sp.wrapping_add(1);
         let most_significant_bye = (self.bus.read_byte(self.sp) as u16) << 8;
 
         most_significant_bye | least_significant_byte
+    }
+
+    fn call(&mut self, should_jump: bool) -> u16 {
+        let next_pc = self.pc.wrapping_add(3);
+
+        if should_jump {
+            self.push(self.pc);
+            self.read_next_word()
+        } else {
+            next_pc
+        }
+    }
+
+    fn ret(&mut self, should_jump: bool) -> u16 {
+        if should_jump {
+            self.pop()
+        } else {
+            self.pc.wrapping_add(1)
+        }
     }
 
     fn read_next_byte(&self) -> u8 {
@@ -1301,7 +1321,7 @@ impl CPU {
                             Indirect::DEIndirect => self.bus.read_byte(self.registers.get_de()),
                             Indirect::HLIndirectMinus => {
                                 self.registers.set_hl(self.registers.get_hl().wrapping_sub(1));
-                                self.bus.read_byte((self.registers.get_hl()))
+                                self.bus.read_byte(self.registers.get_hl())
                             },
                             Indirect::HLIndirectPlus => {
                                 self.registers.set_hl(self.registers.get_hl().wrapping_add(1));
@@ -1355,6 +1375,49 @@ impl CPU {
 
 
                 }
+            }
+            Instruction::CALL(test) => {
+                let jump_condition = match test {
+                    JumpTest::NotZero => !self.registers.f.zero,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::Always => true
+                };
+
+                self.call(jump_condition)
+            }
+            Instruction::RET(test) => {
+                let jump_condition = match test {
+                    JumpTest::NotZero => !self.registers.f.zero,
+                    JumpTest::NotCarry => !self.registers.f.carry,
+                    JumpTest::Zero => self.registers.f.zero,
+                    JumpTest::Carry => self.registers.f.carry,
+                    JumpTest::Always => true
+                };
+
+                self.ret(jump_condition)
+            }
+            Instruction::PUSH(target) => {
+                match target {
+                    StackTarget::AF => self.push(self.registers.get_af()),
+                    StackTarget::BC => self.push(self.registers.get_bc()),
+                    StackTarget::DE => self.push(self.registers.get_de()),
+                    StackTarget::HL => self.push(self.registers.get_hl())
+                }
+
+                self.pc.wrapping_add(1)
+            }
+            Instruction::POP(target) => {
+                let res = self.pop();
+                match target {
+                    StackTarget::AF => self.registers.set_af(res),
+                    StackTarget::BC => self.registers.set_bc(res),
+                    StackTarget::DE => self.registers.set_de(res),
+                    StackTarget::HL => self.registers.set_hl(res)
+                }
+
+                self.pc.wrapping_add(1)
             }
     }
   }

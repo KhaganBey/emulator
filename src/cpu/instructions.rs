@@ -41,7 +41,13 @@ pub enum Instruction {
     JPI,
 
     // Load Instructions
-    LD(LoadType)
+    LD(LoadType),
+
+    // Stack Instructions
+    PUSH(StackTarget),
+    POP(StackTarget),
+    CALL(JumpTest),
+    RET(JumpTest)
 }
 
 pub enum ArithmeticTarget {
@@ -96,21 +102,15 @@ pub enum LoadWordTarget {
 }
 
 pub enum Indirect {
-    BCIndirect,
-    DEIndirect,
-    HLIndirectMinus,
-    HLIndirectPlus,
-    WordIndirect,
-    LastByteIndirect,
+    BCIndirect, DEIndirect, HLIndirectMinus, HLIndirectPlus, WordIndirect, LastByteIndirect,
 }
 
 pub enum LoadType {
-  Byte(LoadByteTarget, LoadByteSource),
-  Word(LoadWordTarget),
-  AFromIndirect(Indirect),
-  IndirectFromA(Indirect),
-  AFromByteAddress,
-  ByteAddressFromA
+  Byte(LoadByteTarget, LoadByteSource), Word(LoadWordTarget), AFromIndirect(Indirect), IndirectFromA(Indirect), AFromByteAddress, ByteAddressFromA
+}
+
+pub enum StackTarget {
+    AF, BC, DE, HL,
 }
 
 impl Instruction {
