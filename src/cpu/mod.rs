@@ -14,6 +14,7 @@ use self::instructions::JumpTest;
 use self::instructions::LoadType;
 use self::instructions::LoadByteSource;
 use self::instructions::LoadByteTarget;
+use self::instructions::LoadWordTarget;
 
 pub struct CPU { 
     pub registers: Registers,
@@ -57,6 +58,10 @@ impl CPU {
 
     fn read_next_byte(&self) -> u8 {
         self.bus.read_byte(self.pc + 1)
+    }
+
+    fn read_next_word(&self) -> u16 {
+        ((self.bus.read_byte(self.pc + 2) as u16) << 8) | (self.bus.read_byte(self.pc + 1) as u16)
     }
 
     fn execute(&mut self, instruction: Instruction) -> u16 {
@@ -1256,6 +1261,19 @@ impl CPU {
                             LoadByteSource::D8  => self.pc.wrapping_add(2),
                             _                   => self.pc.wrapping_add(1),
                           }
+                    }
+
+                    LoadType::Word(target) => {
+                        let word = self.read_next_word();
+
+                        match target {
+                            LoadWordTarget::BC => self.registers.set_bc(word),
+                            LoadWordTarget::DE => self.registers.set_de(word),
+                            LoadWordTarget::HL => self.registers.set_hl(word),
+                            LoadWordTarget::SP => self.sp = word
+                        }
+
+                        self.pc.wrapping_add(3)
                     }
                 }
             }

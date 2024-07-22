@@ -91,8 +91,13 @@ pub enum LoadByteSource {
     A, B, C, D, E, H, L, D8, HL
 }
 
+pub enum LoadWordTarget {
+    BC, DE, HL, SP
+}
+
 pub enum LoadType {
   Byte(LoadByteTarget, LoadByteSource),
+  Word(LoadWordTarget),
 }
 
 impl Instruction {
