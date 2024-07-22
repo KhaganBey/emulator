@@ -15,6 +15,7 @@ use self::instructions::LoadType;
 use self::instructions::LoadByteSource;
 use self::instructions::LoadByteTarget;
 use self::instructions::LoadWordTarget;
+use self::instructions::Indirect;
 
 pub struct CPU { 
     pub registers: Registers,
@@ -1275,6 +1276,66 @@ impl CPU {
 
                         self.pc.wrapping_add(3)
                     }
+
+                    LoadType::IndirectFromA(source) => {
+                        self.registers.a = match source {
+                            Indirect::BCIndirect => self.bus.read_byte(self.registers.get_bc()),
+                            Indirect::DEIndirect => self.bus.read_byte(self.registers.get_de()),
+                            Indirect::HLIndirectMinus => {
+                                self.registers.set_hl(self.registers.get_hl().wrapping_sub(1));
+                                self.bus.read_byte((self.registers.get_hl()))
+                            },
+                            Indirect::HLIndirectPlus => {
+                                self.registers.set_hl(self.registers.get_hl().wrapping_add(1));
+                                self.bus.read_byte(self.registers.get_hl())
+                            },
+                            Indirect::LastByteIndirect => self.bus.read_byte(0xFF00 + self.registers.c as u16),
+                            Indirect::WordIndirect => self.bus.read_byte(self.read_next_word())
+                        };
+                    
+                        match source {
+                            Indirect::WordIndirect => self.pc.wrapping_add(3),
+                            _ => self.pc.wrapping_add(1)
+                        }
+                    }
+
+                    LoadType::AFromIndirect(target) => {
+                        let a = self.registers.a;
+
+                        match target {
+                            Indirect::BCIndirect => self.bus.write_byte(self.registers.get_bc(), a),
+                            Indirect::DEIndirect => self.bus.write_byte(self.registers.get_de(), a),
+                            Indirect::HLIndirectMinus => {
+                                self.registers.set_hl(self.registers.get_hl().wrapping_sub(1));
+                                self.bus.write_byte(self.registers.get_hl(), a)
+                            },
+                            Indirect::HLIndirectPlus => {
+                                self.registers.set_hl(self.registers.get_hl().wrapping_add(1));
+                                self.bus.write_byte(self.registers.get_hl(), a)
+                            },
+                            Indirect::LastByteIndirect => self.bus.write_byte((0xFF00 + self.registers.c) as u16, a),
+                            Indirect::WordIndirect => self.bus.write_byte(self.read_next_word(), a)
+                        }
+
+                        match target {
+                            Indirect::WordIndirect => self.pc.wrapping_add(3),
+                            _ => self.pc.wrapping_add(1)
+                        }
+                    }
+
+                    LoadType::AFromByteAddress => {
+                        let offset = self.read_next_byte() as u16;
+                        self.registers.a = self.bus.read_byte(0xFF00 + offset);
+                        self.pc.wrapping_add(2)
+                    }
+
+                    LoadType::ByteAddressFromA => {
+                        let offset = self.read_next_byte() as u16;
+                        self.bus.write_byte(0xFF00 + offset, self.registers.a);
+                        self.pc.wrapping_add(2)
+                    }
+
+
                 }
             }
     }

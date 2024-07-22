@@ -95,9 +95,22 @@ pub enum LoadWordTarget {
     BC, DE, HL, SP
 }
 
+pub enum Indirect {
+    BCIndirect,
+    DEIndirect,
+    HLIndirectMinus,
+    HLIndirectPlus,
+    WordIndirect,
+    LastByteIndirect,
+}
+
 pub enum LoadType {
   Byte(LoadByteTarget, LoadByteSource),
   Word(LoadWordTarget),
+  AFromIndirect(Indirect),
+  IndirectFromA(Indirect),
+  AFromByteAddress,
+  ByteAddressFromA
 }
 
 impl Instruction {
