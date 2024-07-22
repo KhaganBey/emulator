@@ -55,15 +55,15 @@ pub enum Instruction {
 }
 
 pub enum ArithmeticTarget {
-    A, B, C, D, E, H, L, HL
+    A, B, C, D, E, H, L, HL, D8
 }
 
 pub enum ADDHLTarget {
-    BC, DE, HL,
+    BC, DE, HL, SP
 }
 
 pub enum IncDecTarget {
-    A, B, C, D, E, H, L, BC, DE, HL
+    A, B, C, D, E, H, L, BC, DE, HL, SP
 }
 
 pub enum PrefixTarget {
@@ -134,134 +134,265 @@ impl Instruction {
 
     fn from_byte_not_prefixed(byte: u8) ->Option<Instruction> {
         match byte {
+            0x00 => Some(Instruction::NOP),
+            //0x10 => Some(Instruction::STOP),
             0x20 => Some(Instruction::JR(JumpTest::NotZero)),
             0x30 => Some(Instruction::JR(JumpTest::NotCarry)),
+            0x40 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::B))),
+            0x50 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::B))),
+            0x60 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::B))),
+            0x70 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::B))),
             0x80 => Some(Instruction::ADD(ArithmeticTarget::B)),
             0x90 => Some(Instruction::SUB(ArithmeticTarget::B)),
             0xA0 => Some(Instruction::AND(ArithmeticTarget::B)),
             0xB0 => Some(Instruction::OR(ArithmeticTarget::B)),
+            0xC0 => Some(Instruction::RET(JumpTest::NotZero)),
+            0xD0 => Some(Instruction::RET(JumpTest::NotCarry)),
+            //0xE0 => Some(Instruction::LD,
+            //0xF0 => Some(Instruction::LD,
 
+            0x01 => Some(Instruction::LD(LoadType::Word(LoadWordTarget::BC))),
+            0x11 => Some(Instruction::LD(LoadType::Word(LoadWordTarget::DE))),
+            0x21 => Some(Instruction::LD(LoadType::Word(LoadWordTarget::HL))),
+            0x31 => Some(Instruction::LD(LoadType::Word(LoadWordTarget::SP))),
+            0x41 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::C))),
+            0x51 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::C))),
+            0x61 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::C))),
+            0x71 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::C))),
             0x81 => Some(Instruction::ADD(ArithmeticTarget::C)),
             0x91 => Some(Instruction::SUB(ArithmeticTarget::C)),
             0xA1 => Some(Instruction::AND(ArithmeticTarget::C)),
             0xB1 => Some(Instruction::OR(ArithmeticTarget::C)),
+            0xC1 => Some(Instruction::POP(StackTarget::BC)),
+            0xD1 => Some(Instruction::POP(StackTarget::DE)),
+            0xE1 => Some(Instruction::POP(StackTarget::HL)),
+            0xF1 => Some(Instruction::POP(StackTarget::AF)),
 
-            0x02 => Some(Instruction::INC(IncDecTarget::BC)),
+            0x02 => Some(Instruction::LD(LoadType::IndirectFromA(Indirect::BCIndirect))),
+            0x12 => Some(Instruction::LD(LoadType::IndirectFromA(Indirect::DEIndirect))),
+            0x22 => Some(Instruction::LD(LoadType::IndirectFromA(Indirect::HLIndirectPlus))),
+            0x32 => Some(Instruction::LD(LoadType::IndirectFromA(Indirect::HLIndirectMinus))),
+            0x42 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::D))),
+            0x52 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::D))),
+            0x62 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::D))),
+            0x72 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::D))),
             0x82 => Some(Instruction::ADD(ArithmeticTarget::D)),
             0x92 => Some(Instruction::SUB(ArithmeticTarget::D)),
             0xA2 => Some(Instruction::AND(ArithmeticTarget::D)),
             0xB2 => Some(Instruction::OR(ArithmeticTarget::D)),
             0xC2 => Some(Instruction::JP(JumpTest::NotZero)),
             0xD2 => Some(Instruction::JP(JumpTest::NotCarry)),
+            0xE2 => Some(Instruction::LD(LoadType::IndirectFromA(Indirect::LastByteIndirect))),
+            0xF2 =>Some(Instruction::LD(LoadType::AFromIndirect(Indirect::LastByteIndirect))),
 
             0x03 => Some(Instruction::INC(IncDecTarget::BC)),
             0x13 => Some(Instruction::INC(IncDecTarget::DE)),
             0x23 => Some (Instruction::INC(IncDecTarget::HL)),
-            //0x33 => Some(Instruction::INC(IncDecTarget::SP)),
+            0x33 => Some(Instruction::INC(IncDecTarget::SP)),
+            0x43 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::E))),
+            0x53 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::E))),
+            0x63 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::E))),
+            0x73 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::E))),
             0x83 => Some(Instruction::ADD(ArithmeticTarget::E)),
             0x93 => Some(Instruction::SUB(ArithmeticTarget::E)),
             0xA3 => Some(Instruction::AND(ArithmeticTarget::E)),
             0xB3 => Some(Instruction::OR(ArithmeticTarget::E)),
             0xC3 => Some(Instruction::JP(JumpTest::Always)),
+            //0xF3 =>
 
             0x04 => Some(Instruction::INC(IncDecTarget::B)),
             0x14 => Some(Instruction::INC(IncDecTarget::D)),
             0x24 => Some (Instruction::INC(IncDecTarget::H)),
-            //0x34 => Some (Instruction::INC(IncDecTarget::HL)),
+            0x34 => Some (Instruction::INC(IncDecTarget::HL)),
+            0x44 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::H))),
+            0x54 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::H))),
+            0x64 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::H))),
+            0x74 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::H))),
             0x84 => Some(Instruction::ADD(ArithmeticTarget::H)),
             0x94 => Some(Instruction::SUB(ArithmeticTarget::H)),
             0xA4 => Some(Instruction::AND(ArithmeticTarget::H)),
             0xB4 => Some(Instruction::OR(ArithmeticTarget::H)),
+            0xC4 => Some(Instruction::CALL(JumpTest::NotZero)),
+            0xD4 => Some(Instruction::CALL(JumpTest::NotCarry)),
 
             0x05 => Some(Instruction::DEC(IncDecTarget::B)),
             0x15 => Some(Instruction::DEC(IncDecTarget::D)),
             0x25 => Some(Instruction::DEC(IncDecTarget::H)),
-            //0x34 => Some(Instruction::INC(IncDecTarget::HL)),
+            0x35 => Some(Instruction::INC(IncDecTarget::HL)),
+            0x45 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::L))),
+            0x55 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::L))),
+            0x65 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::L))),
+            0x75 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::L))),
             0x85 => Some(Instruction::ADD(ArithmeticTarget::L)),
             0x95 => Some(Instruction::SUB(ArithmeticTarget::L)),
             0xA5 => Some(Instruction::AND(ArithmeticTarget::L)),
             0xB5 => Some(Instruction::OR(ArithmeticTarget::L)),
+            0xC5 => Some(Instruction::PUSH(StackTarget::BC)),
+            0xD5 => Some(Instruction::PUSH(StackTarget::DE)),
+            0xE5 => Some(Instruction::PUSH(StackTarget::HL)),
+            0xF5 => Some(Instruction::PUSH(StackTarget::AF)),
 
+            0x06 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::D8))),
+            0x16 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::D8))),
+            0x26 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::D8))),
+            0x36 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::D8))),
+            0x46 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::HL))),
+            0x56 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::HL))),
+            0x66 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::HL))),
+            0x76 => Some(Instruction::HALT),
             0x86 => Some(Instruction::ADD(ArithmeticTarget::HL)),
             0x96 => Some(Instruction::SUB(ArithmeticTarget::HL)),
             0xA6 => Some(Instruction::AND(ArithmeticTarget::HL)),
             0xB6 => Some(Instruction::OR(ArithmeticTarget::HL)),
+            0xC6 => Some(Instruction::ADD(ArithmeticTarget::D8)),
+            0xD6 => Some(Instruction::SUB(ArithmeticTarget::D8)),
+            0xE6 => Some(Instruction::AND(ArithmeticTarget::D8)),
+            0xF6 => Some(Instruction::OR(ArithmeticTarget::D8)),
 
             0x07 => Some(Instruction::RLCA),
             0x17 => Some(Instruction::RLA),
+            //0x27 =>
+            0x37 => Some(Instruction::SCF),
+            0x47 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::A))),
+            0x57 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::A))),
+            0x67 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::A))),
+            0x77 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::HL, LoadByteSource::A))),
             0x87 => Some(Instruction::ADD(ArithmeticTarget::A)),
             0x97 => Some(Instruction::SUB(ArithmeticTarget::A)),
             0xA7 => Some(Instruction::AND(ArithmeticTarget::A)),
             0xB7 => Some(Instruction::OR(ArithmeticTarget::A)),
+            //0xC7 =>
+            //0xD7 =>
+            //0xE7 =>
+            //0xF7 =>
 
+            //0x08 => 
             0x18 => Some(Instruction::JR(JumpTest::Always)),
             0x28 => Some(Instruction::JR(JumpTest::Zero)),
             0x38 =>Some(Instruction::JR(JumpTest::Carry)),
+            0x48 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::B))),
+            0x58 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::B))),
+            0x68 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::B))),
+            0x78 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::B))),
             0x88 => Some(Instruction::ADC(ArithmeticTarget::B)),
             0x98 => Some(Instruction::SBC(ArithmeticTarget::B)),
             0xA8 => Some(Instruction::XOR(ArithmeticTarget::B)),
             0xB8 => Some(Instruction::CP(ArithmeticTarget::B)),
+            0xC8 => Some(Instruction::RET(JumpTest::Zero)),
+            0xD8 => Some(Instruction::RET(JumpTest::Carry)),
+            //0xE8 =>
+            //0xF8 =>
 
             0x09 => Some(Instruction::ADDHL(ADDHLTarget::BC)),
             0x19 => Some(Instruction::ADDHL(ADDHLTarget::DE)),
             0x29 => Some(Instruction::ADDHL(ADDHLTarget::HL)),
-            //0x39 => Some(Instruction::ADDHL(ADDHLTarget::SP)),
+            0x39 => Some(Instruction::ADDHL(ADDHLTarget::SP)),
+            0x49 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::C))),
+            0x59 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::C))),
+            0x69 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::C))),
+            0x79 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::C))),
             0x89 => Some(Instruction::ADC(ArithmeticTarget::C)),
             0x99 => Some(Instruction::SBC(ArithmeticTarget::C)),
             0xA9 => Some(Instruction::XOR(ArithmeticTarget::C)),
             0xB9 => Some(Instruction::CP(ArithmeticTarget::C)),
+            0xC9 => Some(Instruction::RET(JumpTest::Always)),
+            //0xD9 =>
+            //0xE9 =>
+            //0xF9 => 
 
+            0x0A => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::BCIndirect))),
+            0x1A => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::DEIndirect))),
+            0x2A => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::HLIndirectPlus))),
+            0x3A => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::HLIndirectMinus))),
+            0x4A => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::D))),
+            0x5A => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::D))),
+            0x6A => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::D))),
+            0x7A => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::D))),
             0x8A => Some(Instruction::ADC(ArithmeticTarget::D)),
             0x9A => Some(Instruction::SBC(ArithmeticTarget::D)),
             0xAA => Some(Instruction::XOR(ArithmeticTarget::D)),
             0xBA => Some(Instruction::CP(ArithmeticTarget::D)),
             0xCA => Some(Instruction::JP(JumpTest::Zero)),
             0xDA => Some(Instruction::JP(JumpTest::Carry)),
+            0xEA => Some(Instruction::LD(LoadType::IndirectFromA(Indirect::WordIndirect))),
+            0xFA => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::WordIndirect))),
 
             0x0B => Some(Instruction::DEC(IncDecTarget::BC)),
             0x1B => Some(Instruction::DEC(IncDecTarget::DE)),
             0x2B => Some(Instruction::DEC(IncDecTarget::HL)),
-            //0x3B => Some(Instruction::DEC(IncDecTarget::SP)),
+            0x3B => Some(Instruction::DEC(IncDecTarget::SP)),
+            0x4B => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::E))),
+            0x5B => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::E))),
+            0x6B => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::E))),
+            0x7B => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::E))),
             0x8B => Some(Instruction::ADC(ArithmeticTarget::E)),
             0x9B => Some(Instruction::SBC(ArithmeticTarget::E)),
             0xAB => Some(Instruction::XOR(ArithmeticTarget::E)),
             0xBB => Some(Instruction::CP(ArithmeticTarget::E)),
+            //0xFB =>
 
             0x0C => Some(Instruction::INC(IncDecTarget::C)),
             0x1C => Some(Instruction::INC(IncDecTarget::E)),
             0x2C => Some(Instruction::INC(IncDecTarget::L)),
             0x3C => Some(Instruction::INC(IncDecTarget::A)),
+            0x4C => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::H))),
+            0x5C => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::H))),
+            0x6C => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::H))),
+            0x7C => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::H))),
             0x8C => Some(Instruction::ADC(ArithmeticTarget::H)),
             0x9C => Some(Instruction::SBC(ArithmeticTarget::H)),
             0xAC => Some(Instruction::XOR(ArithmeticTarget::H)),
             0xBC => Some(Instruction::CP(ArithmeticTarget::H)),
+            0xCC => Some(Instruction::CALL(JumpTest::Zero)),
+            0xDC => Some(Instruction::CALL(JumpTest::Carry)),
 
             0x0D => Some(Instruction::DEC(IncDecTarget::C)),
             0x1D => Some(Instruction::DEC(IncDecTarget::E)),
             0x2D => Some(Instruction::DEC(IncDecTarget::L)),
             0x3D => Some(Instruction::DEC(IncDecTarget::A)),
+            0x4D => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::L))),
+            0x5D => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::L))),
+            0x6D => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::L))),
+            0x7D => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::L))),
             0x8D => Some(Instruction::ADC(ArithmeticTarget::L)),
             0x9D => Some(Instruction::SBC(ArithmeticTarget::L)),
             0xAD => Some(Instruction::XOR(ArithmeticTarget::L)),
             0xBD => Some(Instruction::CP(ArithmeticTarget::L)),
+            0xCD => Some(Instruction::CALL(JumpTest::Always)),
 
+            0x0E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::D8))),
+            0x1E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::D8))),
+            0x2E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::D8))),
+            0x3E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::D8))),
+            0x4E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::HL))),
+            0x5E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::HL))),
+            0x6E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::HL))),
+            0x7E => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::HL))),
             0x8E => Some(Instruction::ADC(ArithmeticTarget::HL)),
             0x9E => Some(Instruction::SBC(ArithmeticTarget::HL)),
             0xAE => Some(Instruction::XOR(ArithmeticTarget::HL)),
             0xBE => Some(Instruction::CP(ArithmeticTarget::HL)),
-            //0xCE =>
-            //0xDE =>
-            //0xEE =>
-            //0xFE =>
+            0xCE => Some(Instruction::ADC(ArithmeticTarget::D8)),
+            0xDE => Some(Instruction::SBC(ArithmeticTarget::D8)),
+            0xEE => Some(Instruction::XOR(ArithmeticTarget::D8)),
+            0xFE => Some(Instruction::CP(ArithmeticTarget::D8)),
             
             0x0F => Some(Instruction::RRCA),
             0x1F => Some(Instruction::RRA),
             0x2F => Some(Instruction::CPL),
             0x3F => Some(Instruction::CCF),
+            0x4F => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::C, LoadByteSource::A))),
+            0x5F => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::E, LoadByteSource::A))),
+            0x6F => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::L, LoadByteSource::A))),
+            0x7F => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::A, LoadByteSource::A))),
             0x8F => Some(Instruction::ADC(ArithmeticTarget::A)),
             0x9F => Some(Instruction::SBC(ArithmeticTarget::A)),
             0xAF => Some(Instruction::XOR(ArithmeticTarget::A)),
             0xBF => Some(Instruction::CP(ArithmeticTarget::A)),
+            //0xCF =>
+            //0xDF =>
+            //0xEF =>
+            //0xFF =>
         }
     }
 }

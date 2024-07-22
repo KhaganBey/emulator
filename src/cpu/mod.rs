@@ -167,6 +167,12 @@ impl CPU {
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
+                    ArithmeticTarget::D8 => {
+                        let value = self.read_next_byte();
+                        let new_value = self.add(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
                 }
             }
             Instruction::ADDHL(target) => { 
@@ -187,6 +193,12 @@ impl CPU {
                         let value = self.registers.get_hl();
                         let new_value = self.add_hl(value);
                         self.registers.set_hl(new_value);
+                        self.pc.wrapping_add(1)
+                    }
+                    ADDHLTarget::SP => {
+                        let value = self.sp;
+                        let new_value = self.add_hl(value);
+                        self.sp = new_value;
                         self.pc.wrapping_add(1)
                     }
                 }
@@ -241,6 +253,12 @@ impl CPU {
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
+                    ArithmeticTarget::D8 => {
+                        let value = self.read_next_byte();
+                        let new_value = self.adc(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
                 }
             }
             Instruction::SUB(target) => {
@@ -291,6 +309,12 @@ impl CPU {
                         let value = self.registers.a as u16;
                         let new_value = self.sub_hl(value);
                         self.registers.a = new_value as u8;
+                        self.pc.wrapping_add(1)
+                    }
+                    ArithmeticTarget::D8 => {
+                        let value = self.read_next_byte();
+                        let new_value = self.sub(value);
+                        self.registers.a = new_value;
                         self.pc.wrapping_add(1)
                     }
                 }
@@ -345,6 +369,12 @@ impl CPU {
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
+                    ArithmeticTarget::D8 => {
+                        let value = self.read_next_byte();
+                        let new_value = self.sbc(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
                 }
             }
             Instruction::AND(target) => {
@@ -395,6 +425,12 @@ impl CPU {
                         let value = self.registers.a as u16;
                         let new_value = self.and_hl(value);
                         self.registers.a = new_value as u8;
+                        self.pc.wrapping_add(1)
+                    }
+                    ArithmeticTarget::D8 => {
+                        let value = self.read_next_byte();
+                        let new_value = self.and(value);
+                        self.registers.a = new_value;
                         self.pc.wrapping_add(1)
                     }
                 }
@@ -449,6 +485,12 @@ impl CPU {
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
+                    ArithmeticTarget::D8 => {
+                        let value = self.read_next_byte();
+                        let new_value = self.or(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
                 }
             }
             Instruction::XOR(target) => {
@@ -501,6 +543,12 @@ impl CPU {
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
+                    ArithmeticTarget::D8 => {
+                        let value = self.read_next_byte();
+                        let new_value = self.xor(value);
+                        self.registers.a = new_value;
+                        self.pc.wrapping_add(1)
+                    }
                 }
             }
             Instruction::CP(target) => {
@@ -535,7 +583,7 @@ impl CPU {
                         self.cp(value);
                         self.pc.wrapping_add(1)
                     }
-                    ArithmeticTarget::L => {
+                    ArithmeticTarget::D8 => {
                         let value = self.registers.l;
                         self.cp(value);
                         self.pc.wrapping_add(1)
@@ -543,6 +591,11 @@ impl CPU {
                     ArithmeticTarget::HL => {
                         let value = self.registers.a as u16;
                         self.cp_hl(value);
+                        self.pc.wrapping_add(1)
+                    }
+                    ArithmeticTarget::L => {
+                        let value = self.read_next_byte();
+                        self.cp(value);
                         self.pc.wrapping_add(1)
                     }
                 }
@@ -609,6 +662,12 @@ impl CPU {
                         self.registers.set_hl(new_value);
                         self.pc.wrapping_add(1)
                     }
+                    IncDecTarget::SP => {
+                        let value = self.sp;
+                        let new_value = self.inc16(value);
+                        self.sp = new_value;
+                        self.pc.wrapping_add(1)
+                    }
                 }
             }
             Instruction::DEC(target) => {
@@ -671,6 +730,12 @@ impl CPU {
                         let value = self.registers.get_hl();
                         let new_value = self.dec16(value);
                         self.registers.set_hl(new_value);
+                        self.pc.wrapping_add(1)
+                    }
+                    IncDecTarget::SP => {
+                        let value = self.sp;
+                        let new_value = self.dec16(value);
+                        self.sp = new_value;
                         self.pc.wrapping_add(1)
                     }
                 }
