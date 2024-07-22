@@ -22,7 +22,8 @@ pub struct CPU {
     pub registers: Registers,
     pc: u16,
     sp: u16,
-    bus: MemoryBus
+    bus: MemoryBus,
+    is_halted: bool
 }
 
 struct MemoryBus {
@@ -104,7 +105,18 @@ impl CPU {
     }
 
     fn execute(&mut self, instruction: Instruction) -> u16 {
+        if self.is_halted {
+            return self.pc
+        }
+
         match instruction {
+            Instruction::NOP => {
+                self.pc.wrapping_add(1)
+            }
+            Instruction::HALT => {
+                self.is_halted = true;
+                self.pc.wrapping_add(1)
+            }
             Instruction::ADD(target) => {
                 match target {
                     ArithmeticTarget::A => {

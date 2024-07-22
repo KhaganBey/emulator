@@ -47,7 +47,11 @@ pub enum Instruction {
     PUSH(StackTarget),
     POP(StackTarget),
     CALL(JumpTest),
-    RET(JumpTest)
+    RET(JumpTest),
+
+    // Control Instructions
+    HALT,
+    NOP
 }
 
 pub enum ArithmeticTarget {
