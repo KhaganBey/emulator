@@ -57,6 +57,24 @@ impl CPU {
         self.pc = next_pc;
     }
 
+    fn push(&mut self, value: u16) {
+        self.sp = self.sp.wrapping_sub(1);
+        self.bus.write_byte(self.sp, ((value & 0xFF00) >> 8) as u8);
+
+        self.sp = self.sp.wrapping_sub(1);
+        self.bus.write_byte(self.sp, (value & 0x00FF) as u8);
+    }
+
+    fn pop(&mut self) -> u16 {
+        let least_significant_byte = (self.bus.read_byte(self.sp) as u16);
+        self.sp = self.sp.wrapping_add(1);
+        
+        self.sp = self.sp.wrapping_add(1);
+        let most_significant_bye = (self.bus.read_byte(self.sp) as u16) << 8;
+
+        most_significant_bye | least_significant_byte
+    }
+
     fn read_next_byte(&self) -> u8 {
         self.bus.read_byte(self.pc + 1)
     }
