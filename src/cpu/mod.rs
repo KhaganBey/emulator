@@ -50,10 +50,10 @@ impl CPU {
         }
 
         let next_pc = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
-            self.execute(instruction);
+            self.execute(instruction)
         } else {
             let description = format!("0x{}{:x}", if prefixed { "cb" } else { "" }, instruction_byte);
-            panic!("Unkown instruction found for: 0x{:x}", instruction_byte);
+            panic!("Unkown instruction found for: 0x{}", description);
         };
 
         self.pc = next_pc;
@@ -162,8 +162,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        let new_value = self.add_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        let new_value = self.add(value);
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
@@ -248,8 +248,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        let new_value = self.adc_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        let new_value = self.adc(value);
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
@@ -306,8 +306,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        let new_value = self.sub_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        let new_value = self.sub(value);
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
@@ -364,8 +364,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        let new_value = self.sbc_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        let new_value = self.sbc(value);
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
@@ -422,8 +422,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        let new_value = self.and_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        let new_value = self.and(value);
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
@@ -480,8 +480,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        let new_value = self.or_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        let new_value = self.or(value);
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
@@ -538,8 +538,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        let new_value = self.xor_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        let new_value = self.xor(value);
                         self.registers.a = new_value as u8;
                         self.pc.wrapping_add(1)
                     }
@@ -589,8 +589,8 @@ impl CPU {
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::HL => {
-                        let value = self.registers.a as u16;
-                        self.cp_hl(value);
+                        let value = self.bus.read_byte(self.registers.get_hl());
+                        self.cp(value);
                         self.pc.wrapping_add(1)
                     }
                     ArithmeticTarget::L => {
@@ -1428,7 +1428,7 @@ impl CPU {
                                 self.registers.set_hl(self.registers.get_hl().wrapping_add(1));
                                 self.bus.write_byte(self.registers.get_hl(), a)
                             },
-                            Indirect::LastByteIndirect => self.bus.write_byte((0xFF00 + self.registers.c) as u16, a),
+                            Indirect::LastByteIndirect => self.bus.write_byte(0xFF00 + self.registers.c as u16, a),
                             Indirect::WordIndirect => self.bus.write_byte(self.read_next_word(), a)
                         }
 
@@ -1537,18 +1537,6 @@ impl CPU {
         newer_value
     }
 
-    pub fn adc_hl(&mut self, value: u16) -> u16 {
-        let (new_value, did_overflow) = self.registers.get_hl().overflowing_add(value);
-        let (newer_value, did_overflow2) = self.registers.get_hl().overflowing_add(did_overflow as u16);
-
-        self.registers.f.zero = new_value == 0;
-        self.registers.f.subtract = false;
-        self.registers.f.carry = did_overflow | did_overflow2;
-        self.registers.f.half_carry = (value & 0xFFF) + (self.registers.get_hl() & 0xFFF) > 0xFFF;
-
-        newer_value
-    }
-
     pub fn sub(&mut self, value: u8) -> u8 {
         let (new_value, did_overflow) = self.registers.a.overflowing_sub(value);
 
@@ -1556,17 +1544,6 @@ impl CPU {
         self.registers.f.subtract = true;
         self.registers.f.carry = did_overflow;
         self.registers.f.half_carry = ((self.registers.a & 0xF) as i32) - ((value & 0xF) as i32) < 0;
-
-        new_value
-    }
-
-    pub fn sub_hl(&mut self, value: u16) -> u16 {
-        let (new_value, did_overflow) = self.registers.get_hl().overflowing_sub(value);
-
-        self.registers.f.zero = new_value == 0;
-        self.registers.f.subtract = true;
-        self.registers.f.carry = did_overflow;
-        self.registers.f.half_carry = ((self.registers.get_hl() & 0xFFF) as i32) - ((value & 0xFFF) as i32) < 0;
 
         new_value
     }
@@ -1579,18 +1556,6 @@ impl CPU {
         self.registers.f.subtract = true;
         self.registers.f.carry = did_overflow | did_overflow2;
         self.registers.f.half_carry = ((self.registers.a & 0xF) as i32) - ((value & 0xF) as i32) < 0;
-
-        newer_value
-    }
-
-    pub fn sbc_hl(&mut self, value: u16) -> u16 {
-        let (new_value, did_overflow) = self.registers.get_hl().overflowing_sub(value);
-        let (newer_value, did_overflow2) = self.registers.get_hl().overflowing_sub(did_overflow as u16);
-
-        self.registers.f.zero = new_value == 0;
-        self.registers.f.subtract = true;
-        self.registers.f.carry = did_overflow | did_overflow2;
-        self.registers.f.half_carry = ((self.registers.get_hl() & 0xFFF) as i32) - ((value & 0xFFF) as i32) < 0;
 
         newer_value
     }
@@ -1617,41 +1582,8 @@ impl CPU {
         new_value
     }
 
-    pub fn and_hl(&mut self, value: u16) -> u16 {
-        let new_value = value & self.registers.get_hl();
-
-        self.registers.f.zero = new_value == 0;
-        self.registers.f.subtract = false;
-        self.registers.f.carry = false;
-        self.registers.f.half_carry = true;
-
-        new_value
-    }
-
-    pub fn or_hl(&mut self, value: u16) -> u16 {
-        let new_value = value | self.registers.get_hl();
-
-        self.registers.f.zero = new_value == 0;
-        self.registers.f.subtract = false;
-        self.registers.f.carry = false;
-        self.registers.f.half_carry = false;
-
-        new_value
-    }
-
     pub fn xor(&mut self, value: u8) -> u8 {
         let new_value = self.registers.a ^ value;
-
-        self.registers.f.zero = new_value == 0;
-        self.registers.f.subtract = false;
-        self.registers.f.carry = false;
-        self.registers.f.half_carry = false;
-
-        new_value
-    }
-
-    pub fn xor_hl(&mut self, value: u16) -> u16 {
-        let new_value = value ^ self.registers.get_hl();
 
         self.registers.f.zero = new_value == 0;
         self.registers.f.subtract = false;
@@ -1668,15 +1600,6 @@ impl CPU {
         self.registers.f.subtract = true;
         self.registers.f.carry = did_overflow;
         self.registers.f.half_carry = ((self.registers.a & 0xF) as i32) - ((value & 0xF) as i32) < 0;
-    }
-
-    pub fn cp_hl(&mut self, value: u16) {
-        let (new_value, did_overflow) = self.registers.get_hl().overflowing_sub(value);
-
-        self.registers.f.zero = new_value == 0;
-        self.registers.f.subtract = true;
-        self.registers.f.carry = did_overflow;
-        self.registers.f.half_carry = ((self.registers.a & 0xFFF) as i32) - ((value & 0xFFF) as i32) < 0;
     }
 
     pub fn inc(&mut self, value: u8) -> u8 {
