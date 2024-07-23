@@ -2,6 +2,7 @@ pub mod flags_register;
 pub mod instructions;
 pub mod registers;
 
+use crate::memory_bus::MemoryBus;
 use self::registers::Registers;
 use self::instructions::Instruction;
 
@@ -24,20 +25,6 @@ pub struct CPU {
     sp: u16,
     bus: MemoryBus,
     is_halted: bool
-}
-
-struct MemoryBus {
-    memory: [u8; 0xFFFF]
-}
-
-impl MemoryBus {
-    fn read_byte(&self, adress: u16) -> u8 {
-        self.memory[adress as usize]
-    }
-
-    fn write_byte(&mut self, adress: u16, byte: u8) {
-        self.memory[adress as usize] = byte;
-    }
 }
 
 impl CPU {

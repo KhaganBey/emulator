@@ -1,5 +1,10 @@
 mod cpu;
+mod gpu;
+mod memory_bus;
 
 fn main() {
-    println!("ok!");
+    while true {
+        println!("ok");
+        break;    
+    }
 }
