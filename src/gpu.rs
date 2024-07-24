@@ -32,7 +32,7 @@ impl GPU {
 
     pub fn write_vram(&mut self, address: usize, value: u8) {
         self.vram[address] = value;
-        if address > 0x1800 { return }
+        /*if address > 0x1800 { return }
 
         let normalised_address = address & 0xFFEF;
 
@@ -43,7 +43,7 @@ impl GPU {
         let row_address = (address % 16) / 2;
 
         for pixel_address in 0 ..= 8 {
-            let mask = 0b00000001 << (7 - pixel_address);
+            let mask = 1 << (7 - pixel_address);
             let least_significant_byte = byte1 & mask;
             let most_significant_byte = byte2 & mask;
 
@@ -55,6 +55,6 @@ impl GPU {
             };
 
             self.tile_set[tile_address][row_address][pixel_address] = value;
-        }
+        }*/
     }
 }

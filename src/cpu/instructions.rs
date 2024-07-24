@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Instruction {
     // Arithmetic Instructions
     ADD(ArithmeticTarget),
@@ -53,23 +54,23 @@ pub enum Instruction {
     HALT,
     NOP
 }
-
+#[derive(Debug)]
 pub enum ArithmeticTarget {
     A, B, C, D, E, H, L, HL, D8
 }
-
+#[derive(Debug)]
 pub enum ADDHLTarget {
     BC, DE, HL, SP
 }
-
+#[derive(Debug)]
 pub enum IncDecTarget {
     A, B, C, D, E, H, L, BC, DE, HL, SP, HLI
 }
-
+#[derive(Debug)]
 pub enum PrefixTarget {
     A, B, C, D, E, H, L, HL
 }
-
+#[derive(Debug)]
 pub enum BitPosition {
     B0, B1, B2, B3, B4, B5, B6, B7
 }
@@ -88,31 +89,31 @@ impl std::convert::From<BitPosition> for u8 {
         }
     }
 }
-
+#[derive(Debug)]
 pub enum JumpTest {
     NotZero, Zero, NotCarry, Carry, Always
 }
-
+#[derive(Debug)]
 pub enum LoadByteTarget {
     A, B, C, D, E, H, L, HL
 }
-
+#[derive(Debug)]
 pub enum LoadByteSource {
     A, B, C, D, E, H, L, D8, HL
 }
-
+#[derive(Debug)]
 pub enum LoadWordTarget {
     BC, DE, HL, SP
 }
-
+#[derive(Debug)]
 pub enum Indirect {
     BCIndirect, DEIndirect, HLIndirectMinus, HLIndirectPlus, WordIndirect, LastByteIndirect,
 }
-
+#[derive(Debug)]
 pub enum LoadType {
   Byte(LoadByteTarget, LoadByteSource), Word(LoadWordTarget), AFromIndirect(Indirect), IndirectFromA(Indirect), AFromByteAddress, ByteAddressFromA
 }
-
+#[derive(Debug)]
 pub enum StackTarget {
     AF, BC, DE, HL,
 }

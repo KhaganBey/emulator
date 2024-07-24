@@ -36,6 +36,7 @@ pub const UNUSED_END: usize = 0xFEFF;
 
 pub const IO_REGISTERS_BEGIN: usize = 0xFF00;
 pub const IO_REGISTERS_END: usize = 0xFF7F;
+pub const IO_REGISTERS_SIZE: usize = IO_REGISTERS_END - IO_REGISTERS_BEGIN;
 
 pub const ZERO_PAGE_BEGIN: usize = 0xFF80;
 pub const ZERO_PAGE_END: usize = 0xFFFE;
@@ -50,6 +51,7 @@ pub struct MemoryBus {
     external_ram: [u8; EXTERNAL_RAM_SIZE],
     working_ram: [u8; WORKING_RAM_SIZE],
     zero_page: [u8; ZERO_PAGE_SIZE],
+    io_temp: [u8; IO_REGISTERS_SIZE],
     gpu: GPU
 }
 
@@ -61,14 +63,17 @@ impl MemoryBus {
         if boot_rom.len() != BOOT_ROM_SIZE { panic!("Invalid boot rom, size does not match reality."); }
 
         let mut rom_bank_0 = [0; ROM_BANK_0_SIZE];
-        /*for i in 0 ..= ROM_BANK_0_SIZE {
+        for i in 0 ..= ROM_BANK_0_SIZE - 1 {
             rom_bank_0[i] = game_rom[i];
-        }*/
+        }
 
         let mut rom_bank_n = [0; ROM_BANK_N_SIZE];
-        /*for i in 0 ..= ROM_BANK_N_SIZE {
+        for i in 0 ..= ROM_BANK_N_SIZE - 1 {
             rom_bank_n[i] = game_rom[ROM_BANK_0_SIZE + i];
-        }*/
+        }
+
+        let mut io_temp = [0; IO_REGISTERS_SIZE];
+        io_temp[0xff44 - IO_REGISTERS_BEGIN] = 0x90;
 
         MemoryBus {
             boot_rom,
@@ -77,6 +82,7 @@ impl MemoryBus {
             external_ram: [0; EXTERNAL_RAM_SIZE],
             working_ram: [0; WORKING_RAM_SIZE],
             zero_page: [0; ZERO_PAGE_SIZE],
+            io_temp,
             gpu: GPU::new()
         }
     }
@@ -96,15 +102,17 @@ impl MemoryBus {
                     self.rom_bank_0[address]
                 }
             }
-            ROM_BANK_0_BEGIN ..= ROM_BANK_0_END => self.rom_bank_0[address],
+            ROM_BANK_0_BEGIN ..= ROM_BANK_0_END => {
+                self.rom_bank_0[address]
+            }
             ROM_BANK_N_BEGIN ..= ROM_BANK_N_END => self.rom_bank_n[address - ROM_BANK_N_BEGIN],
             VRAM_BEGIN ..= VRAM_END => { self.gpu.read_vram(address - VRAM_BEGIN) }
             WORKING_RAM_BEGIN ..= WORKING_RAM_END => self.working_ram[address - WORKING_RAM_BEGIN],
             ECHO_RAM_BEGIN ..= ECHO_RAM_END => self.working_ram[address - ECHO_RAM_BEGIN],
             //OAM_BEGIN ..= OAM_END =>
             IO_REGISTERS_BEGIN ..= IO_REGISTERS_END => {
-                println!("IO registers are not implemented yet, but the execution of the program will continue by returning 0.");
-                0
+                println!("IO registers are not implemented yet, but the execution of the program will continue.");
+                self.io_temp[address - IO_REGISTERS_BEGIN]
             }
             UNUSED_BEGIN ..= UNUSED_END => { 0 }
             ZERO_PAGE_BEGIN ..= ZERO_PAGE_END => self.zero_page[address - ZERO_PAGE_BEGIN],
@@ -134,6 +142,7 @@ impl MemoryBus {
             }
             IO_REGISTERS_BEGIN..=IO_REGISTERS_END => {
                 println!("IO Registers are not implemented yet, but the execution of the program will continue.");
+                self.io_temp[address - IO_REGISTERS_BEGIN] = byte;
             }
             UNUSED_BEGIN ..= UNUSED_END => { }
             ZERO_PAGE_BEGIN ..= ZERO_PAGE_END => {
