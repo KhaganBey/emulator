@@ -1,6 +1,4 @@
-pub const VRAM_BEGIN: usize = 0x8000;
-pub const VRAM_END: usize = 0x9FFF;
-const VRAM_SIZE: usize = VRAM_END - VRAM_BEGIN + 1;
+use crate::memory_bus::VRAM_SIZE;
 
 #[derive(Copy,Clone)]
 enum TilePixelValue {
@@ -21,6 +19,13 @@ pub struct GPU {
 }
 
 impl GPU {
+    pub fn new() ->GPU {
+        GPU {
+            vram: [0; VRAM_SIZE],
+            tile_set: [empty_tile(); 384]
+        }
+    }
+
     pub fn read_vram(&self, address: usize) -> u8 {
         self.vram[address]
     }

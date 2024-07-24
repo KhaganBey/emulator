@@ -418,8 +418,8 @@ impl Instruction {
             0xB0 => Some(Instruction::OR(ArithmeticTarget::B)),
             0xC0 => Some(Instruction::RET(JumpTest::NotZero)),
             0xD0 => Some(Instruction::RET(JumpTest::NotCarry)),
-            //0xE0 => Some(Instruction::LD,
-            //0xF0 => Some(Instruction::LD,
+            0xE0 => Some(Instruction::LD(LoadType::ByteAddressFromA)),
+            0xF0 => Some(Instruction::LD(LoadType::AFromByteAddress)),
 
             0x01 => Some(Instruction::LD(LoadType::Word(LoadWordTarget::BC))),
             0x11 => Some(Instruction::LD(LoadType::Word(LoadWordTarget::DE))),

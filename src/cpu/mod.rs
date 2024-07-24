@@ -21,26 +21,46 @@ use self::instructions::StackTarget;
 
 pub struct CPU { 
     pub registers: Registers,
-    pc: u16,
-    sp: u16,
-    bus: MemoryBus,
-    is_halted: bool
+    pub pc: u16,
+    pub sp: u16,
+    pub bus: MemoryBus,
+    pub is_halted: bool
 }
 
 impl CPU {
-    fn step(&mut self) {
+    pub fn new(boot_rom: Vec<u8>, game_rom: Vec<u8>) -> CPU {
+        CPU {
+            registers: Registers::new(),
+            pc: 0x0,
+            sp: 0x00,
+            bus: MemoryBus::new(boot_rom, game_rom),
+            is_halted: false
+        }
+    }
+
+
+    pub fn step(&mut self) {
+        println!("current program counter: 0x{:x}", self.pc);
+
+        if self.pc >= 0x100 {
+            println!("Boot successfuly completed!");
+        }
+
         let mut instruction_byte = self.bus.read_byte(self.pc);
+        println!("Current instruction byte: 0x{:x}", instruction_byte);
 
         let prefixed = instruction_byte == 0xCB;
         if prefixed {
+            let previous = instruction_byte;
             instruction_byte = self.bus.read_byte(self.pc + 1);
+            println!("prefixed instruction byte found: 0x{:x}{:x}", previous, instruction_byte);
         }
 
         let next_pc = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
             self.execute(instruction)
         } else {
             let description = format!("0x{}{:x}", if prefixed { "cb" } else { "" }, instruction_byte);
-            panic!("Unkown instruction found for: 0x{}", description);
+            panic!("Unkown instruction found: {}", description);
         };
 
         self.pc = next_pc;
@@ -1436,8 +1456,6 @@ impl CPU {
                         self.bus.write_byte(0xFF00 + offset, self.registers.a);
                         self.pc.wrapping_add(2)
                     }
-
-
                 }
             }
             Instruction::CALL(test) => {
