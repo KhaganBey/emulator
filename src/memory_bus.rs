@@ -81,6 +81,10 @@ impl MemoryBus {
         }
     }
 
+    pub fn step(&mut self, cycles: u8) {
+        //
+    }
+
     pub fn read_byte(&self, address: u16) -> u8 {
         let address = address as usize;
 

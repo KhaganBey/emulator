@@ -63,7 +63,7 @@ pub enum ADDHLTarget {
 }
 
 pub enum IncDecTarget {
-    A, B, C, D, E, H, L, BC, DE, HL, SP
+    A, B, C, D, E, H, L, BC, DE, HL, SP, HLI
 }
 
 pub enum PrefixTarget {
@@ -473,7 +473,7 @@ impl Instruction {
             0x04 => Some(Instruction::INC(IncDecTarget::B)),
             0x14 => Some(Instruction::INC(IncDecTarget::D)),
             0x24 => Some (Instruction::INC(IncDecTarget::H)),
-            0x34 => Some (Instruction::INC(IncDecTarget::HL)),
+            0x34 => Some (Instruction::INC(IncDecTarget::HLI)),
             0x44 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::H))),
             0x54 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::H))),
             0x64 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::H))),
@@ -488,7 +488,7 @@ impl Instruction {
             0x05 => Some(Instruction::DEC(IncDecTarget::B)),
             0x15 => Some(Instruction::DEC(IncDecTarget::D)),
             0x25 => Some(Instruction::DEC(IncDecTarget::H)),
-            0x35 => Some(Instruction::INC(IncDecTarget::HL)),
+            0x35 => Some(Instruction::INC(IncDecTarget::HLI)),
             0x45 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::L))),
             0x55 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::L))),
             0x65 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::L))),
@@ -567,7 +567,7 @@ impl Instruction {
             0xB9 => Some(Instruction::CP(ArithmeticTarget::C)),
             0xC9 => Some(Instruction::RET(JumpTest::Always)),
             //0xD9 =>
-            //0xE9 =>
+            0xE9 => Some(Instruction::JPI),
             //0xF9 => 
 
             0x0A => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::BCIndirect))),
