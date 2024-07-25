@@ -19,24 +19,30 @@ use self::instructions::LoadWordTarget;
 use self::instructions::Indirect;
 use self::instructions::StackTarget;
 
+pub const VBLANK_ADD: u16 = 0x40;
+pub const LCDSTAT_ADD: u16 = 0x48;
+pub const TIMER_ADD: u16 = 0x50;
+
 pub struct CPU { 
     pub registers: Registers,
     pub pc: u16,
     pub sp: u16,
     pub bus: MemoryBus,
     pub is_halted: bool,
-    pub is_booted: bool
+    pub is_booted: bool,
+    pub interrupt_enabled: bool
 }
 
 impl CPU {
     pub fn new(boot_rom: Vec<u8>, game_rom: Vec<u8>) -> CPU {
         CPU {
             registers: Registers::new(),
-            pc: 0x0,
+            pc: 0x00,
             sp: 0x00,
             bus: MemoryBus::new(boot_rom, game_rom),
             is_halted: false,
-            is_booted: false
+            is_booted: false,
+            interrupt_enabled: true
         }
     }
 
@@ -49,17 +55,47 @@ impl CPU {
             let previous = instruction_byte;
             instruction_byte = self.bus.read_byte(self.pc + 1);
         }
-
+        
         let (next_pc, mut cycles) = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
             self.execute(instruction)
         } else {
-            let description = format!("0x{}{:x}", if prefixed { "cb" } else { "" }, instruction_byte);
-            panic!("Unkown instruction found: {} at 0x{}", description, self.pc);
+            let description = format!("0x{}{:2x}", if prefixed { "cb" } else { "" }, instruction_byte);
+            panic!("Unkown instruction found: {} at 0x{:4x}", description, self.pc);
         };
-
+        
         self.bus.step(cycles);
-        self.pc = next_pc;
+        if !self.is_halted { self.pc = next_pc; }
+        if self.bus.interrupted() { self.is_halted = false; }
+        
+        let mut interrupted = false;
+        if self.interrupt_enabled && self.bus.interrupted() {
+            if self.bus.interrupt_enable.vblank && self.bus.interrupt_flag.vblank {
+                interrupted = true;
+                self.bus.interrupt_flag.vblank = false;
+                self.interrupt(VBLANK_ADD)
+            }
+            if self.bus.interrupt_enable.lcd && self.bus.interrupt_flag.lcd {
+                interrupted = true;
+                self.bus.interrupt_flag.lcd = false;
+                self.interrupt(LCDSTAT_ADD)
+            }
+            if self.bus.interrupt_enable.timer && self.bus.interrupt_flag.timer {
+                interrupted = true;
+                self.bus.interrupt_flag.timer = false;
+                self.interrupt(TIMER_ADD)
+            }
+        }
+
+        if interrupted { cycles += 12 }
+
         cycles
+    }
+
+    fn interrupt(&mut self, location: u16) {
+        self.interrupt_enabled = false;
+        self.push(self.pc);
+        self.pc = location;
+        self.bus.step(12);
     }
 
     fn push(&mut self, value: u16) {
@@ -91,30 +127,24 @@ impl CPU {
     }
 
     fn ret(&mut self, should_jump: bool, always: bool) -> (u16, u8) {
-        let address = self.pop();
-        
         if always {
-            (address, 16)
+            (self.pop(), 16)
         } else if should_jump {
-            (address, 20)
+            (self.pop(), 20)
         } else {
             (self.pc.wrapping_add(1), 8)
         }
     }
 
-    fn read_next_byte(&self) -> u8 {
+    pub fn read_next_byte(&self) -> u8 {
         self.bus.read_byte(self.pc + 1)
     }
 
-    fn read_next_word(&self) -> u16 {
+    pub fn read_next_word(&self) -> u16 {
         ((self.bus.read_byte(self.pc + 2) as u16) << 8) | (self.bus.read_byte(self.pc + 1) as u16)
     }
 
     fn execute(&mut self, instruction: Instruction) -> (u16, u8) {
-        if self.is_halted {
-            return (self.pc, 4)
-        }
-        
         match instruction {
             Instruction::NOP => {
                 (self.pc.wrapping_add(1), 4)
@@ -204,7 +234,7 @@ impl CPU {
                     ADDHLTarget::SP => {
                         let value = self.sp;
                         let new_value = self.add_hl(value);
-                        self.sp = new_value;
+                        self.registers.set_hl(new_value);
                         (self.pc.wrapping_add(1), 8)
                     }
                 }
@@ -547,13 +577,13 @@ impl CPU {
                         let value = self.bus.read_byte(self.registers.get_hl());
                         let new_value = self.xor(value);
                         self.registers.a = new_value as u8;
-                        (self.pc.wrapping_add(1), 4)
+                        (self.pc.wrapping_add(1), 8)
                     }
                     ArithmeticTarget::D8 => {
                         let value = self.read_next_byte();
                         let new_value = self.xor(value);
                         self.registers.a = new_value;
-                        (self.pc.wrapping_add(1), 4)
+                        (self.pc.wrapping_add(2), 8)
                     }
                 }
             }
@@ -771,22 +801,22 @@ impl CPU {
                 (self.pc.wrapping_add(1), 4)
             }
             Instruction::RRA => {
-                let new_value = self.rotate_r_flag(self.registers.a);
+                let new_value = self.rotate_r_flag(self.registers.a, false);
                 self.registers.a = new_value;
                 (self.pc.wrapping_add(1), 4)
             }
             Instruction::RLA => {
-                let new_value = self.rotate_l_flag(self.registers.a);
+                let new_value = self.rotate_l_flag(self.registers.a, false);
                 self.registers.a = new_value;
                 (self.pc.wrapping_add(1), 4)
             }
             Instruction::RRCA => {
-                let new_value = self.rotate_r(self.registers.a);
+                let new_value = self.rotate_r(self.registers.a, false);
                 self.registers.a = new_value;
                 (self.pc.wrapping_add(1), 4)
             }
             Instruction::RLCA => {
-                let new_value = self.rotate_l(self.registers.a);
+                let new_value = self.rotate_l(self.registers.a, false);
                 self.registers.a = new_value;
                 (self.pc.wrapping_add(1), 4)
             }
@@ -1134,49 +1164,49 @@ impl CPU {
                 match target {
                     PrefixTarget::A => {
                         let value = self.registers.a;
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.registers.a = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::B => {
                         let value = self.registers.b;
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.registers.b = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::C => {
                         let value = self.registers.c;
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.registers.c = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::D => {
                         let value = self.registers.d;
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.registers.d = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::E => {
                         let value = self.registers.e;
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.registers.e = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::H => {
                         let value = self.registers.h;
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.registers.h = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::L => {
                         let value = self.registers.l;
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.registers.l = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::HL => {
                         let value = self.bus.read_byte(self.registers.get_hl());
-                        let new_value = self.rotate_r_flag(value);
+                        let new_value = self.rotate_r_flag(value, true);
                         self.bus.write_byte(self.registers.get_hl(), new_value);
                         (self.pc.wrapping_add(2), 16)
                     }
@@ -1186,49 +1216,49 @@ impl CPU {
                 match target {
                     PrefixTarget::A => {
                         let value = self.registers.a;
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.registers.a = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::B => {
                         let value = self.registers.b;
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.registers.b = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::C => {
                         let value = self.registers.c;
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.registers.c = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::D => {
                         let value = self.registers.d;
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.registers.d = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::E => {
                         let value = self.registers.e;
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.registers.e = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::H => {
                         let value = self.registers.h;
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.registers.h = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::L => {
                         let value = self.registers.l;
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.registers.l = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::HL => {
                         let value = self.bus.read_byte(self.registers.get_hl());
-                        let new_value = self.rotate_l_flag(value);
+                        let new_value = self.rotate_l_flag(value, false);
                         self.bus.write_byte(self.registers.get_hl(), new_value);
                         (self.pc.wrapping_add(2), 16)
                     }
@@ -1238,49 +1268,49 @@ impl CPU {
                 match target {
                     PrefixTarget::A => {
                         let value = self.registers.a;
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.registers.a = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::B => {
                         let value = self.registers.b;
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.registers.b = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::C => {
                         let value = self.registers.c;
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.registers.c = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::D => {
                         let value = self.registers.d;
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.registers.d = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::E => {
                         let value = self.registers.e;
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.registers.e = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::H => {
                         let value = self.registers.h;
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.registers.h = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::L => {
                         let value = self.registers.l;
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.registers.l = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::HL => {
                         let value = self.bus.read_byte(self.registers.get_hl());
-                        let new_value = self.rotate_r(value);
+                        let new_value = self.rotate_r(value, true);
                         self.bus.write_byte(self.registers.get_hl(), new_value);
                         (self.pc.wrapping_add(2), 16)
                     }
@@ -1290,49 +1320,49 @@ impl CPU {
                 match target {
                     PrefixTarget::A => {
                         let value = self.registers.a;
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.registers.a = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::B => {
                         let value = self.registers.b;
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.registers.b = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::C => {
                         let value = self.registers.c;
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.registers.c = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::D => {
                         let value = self.registers.d;
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.registers.d = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::E => {
                         let value = self.registers.e;
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.registers.e = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::H => {
                         let value = self.registers.h;
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.registers.h = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::L => {
                         let value = self.registers.l;
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.registers.l = new_value;
                         (self.pc.wrapping_add(2), 8)
                     }
                     PrefixTarget::HL => {
                         let value = self.bus.read_byte(self.registers.get_hl());
-                        let new_value = self.rotate_l(value);
+                        let new_value = self.rotate_l(value, true);
                         self.bus.write_byte(self.registers.get_hl(), new_value);
                         (self.pc.wrapping_add(2), 16)
                     }
@@ -1406,7 +1436,7 @@ impl CPU {
 
                     LoadType::Word(target) => {
                         let word = self.read_next_word();
-
+                        
                         match target {
                             LoadWordTarget::BC => self.registers.set_bc(word),
                             LoadWordTarget::DE => self.registers.set_de(word),
@@ -1429,6 +1459,7 @@ impl CPU {
                             Indirect::HLIndirectPlus => {
                                 let hl = self.registers.get_hl();
                                 self.registers.set_hl(self.registers.get_hl().wrapping_add(1));
+                                
                                 self.bus.read_byte(hl)
                             },
                             Indirect::LastByteIndirect => self.bus.read_byte(0xFF00 + self.registers.c as u16),
@@ -1445,20 +1476,32 @@ impl CPU {
                         let a = self.registers.a;
 
                         match target {
-                            Indirect::BCIndirect => self.bus.write_byte(self.registers.get_bc(), a),
-                            Indirect::DEIndirect => self.bus.write_byte(self.registers.get_de(), a),
+                            Indirect::BCIndirect => {
+                                let bc = self.registers.get_bc();
+                                self.bus.write_byte(bc, a)
+                            }
+                            Indirect::DEIndirect => {
+                                let de = self.registers.get_de();
+                                self.bus.write_byte(de, a)
+                            }
                             Indirect::HLIndirectMinus => {
                                 let hl = self.registers.get_hl();
-                                self.registers.set_hl(self.registers.get_hl().wrapping_sub(1));
-                                self.bus.write_byte(hl, a)
-                            },
+                                self.registers.set_hl(hl.wrapping_sub(1));
+                                self.bus.write_byte(hl, a);
+                            }
                             Indirect::HLIndirectPlus => {
                                 let hl = self.registers.get_hl();
-                                self.registers.set_hl(self.registers.get_hl().wrapping_add(1));
-                                self.bus.write_byte(hl, a)
-                            },
-                            Indirect::LastByteIndirect => self.bus.write_byte(0xFF00 + self.registers.c as u16, a),
-                            Indirect::WordIndirect => self.bus.write_byte(self.read_next_word(), a)
+                                self.registers.set_hl(hl.wrapping_add(1));
+                                self.bus.write_byte(hl, a);
+                            }
+                            Indirect::WordIndirect => {
+                                let word = self.read_next_word();
+                                self.bus.write_byte(word, a);
+                            }
+                            Indirect::LastByteIndirect => {
+                                let c = self.registers.c as u16;
+                                self.bus.write_byte(0xFF00 + c, a);
+                            }
                         }
 
                         match target {
@@ -1470,7 +1513,7 @@ impl CPU {
                     LoadType::AFromByteAddress => {
                         let offset = self.read_next_byte() as u16;
                         self.registers.a = self.bus.read_byte(0xFF00 + offset);
-                        
+                         
                         (self.pc.wrapping_add(2), 12)
                     }
 
@@ -1478,6 +1521,33 @@ impl CPU {
                         let offset = self.read_next_byte() as u16;
                         self.bus.write_byte(0xFF00 + offset, self.registers.a);
                         (self.pc.wrapping_add(2), 12)
+                    }
+
+                    LoadType::SPFromHL => {
+                        self.sp = self.registers.get_hl();
+                        (self.pc.wrapping_add(1), 8)
+                    }
+
+                    LoadType::WordFromSP => {
+                        let address = self.read_next_word();
+
+                        self.bus.write_byte(address.wrapping_add(1), (self.sp & 0xFF00 >> 8) as u8);
+                        self.bus.write_byte(address, (self.sp & 0x00FF) as u8);
+
+                        (self.pc.wrapping_add(3), 20)
+                    }
+
+                    LoadType::HLFromSPPlus => {
+                        let offset = self.read_next_byte() as i8 as i16 as u16;
+                        let result = self.sp.wrapping_add(offset);
+                        self.registers.set_hl(result);
+
+                        self.registers.f.zero = false;
+                        self.registers.f.subtract = false;
+                        self.registers.f.half_carry = (self.sp & 0xF) + (offset & 0xF) > 0xF;
+                        self.registers.f.carry = (self.sp & 0xFF) + (offset & 0xFF) > 0xFF;
+
+                        (self.pc.wrapping_add(3), 12)
                     }
                 }
             }
@@ -1529,6 +1599,32 @@ impl CPU {
 
                 (self.pc.wrapping_add(1), 12)
             }
+            Instruction::DI => {
+                self.interrupt_enabled = false;
+                (self.pc.wrapping_add(1), 4)
+            }
+            Instruction::EI => {
+                self.interrupt_enabled = true;
+                (self.pc.wrapping_add(1), 4)
+            }
+            Instruction::DAA => {
+                let new_value = self.decimal_adjust(self.registers.a);
+                self.registers.a = new_value;
+
+                (self.pc.wrapping_add(1), 4)
+            }
+            Instruction::ADDSP => {
+                let byte = self.read_next_byte() as i8 as i16 as u16;
+                let new_value = self.sp.wrapping_add(byte);
+
+                self.registers.f.zero = false;
+                self.registers.f.subtract = false;
+                self.registers.f.carry = (self.sp & 0xFF) + (byte & 0xFF) > 0xFF;
+                self.registers.f.half_carry = (self.sp & 0xF) + (byte & 0xF) > 0xF;
+
+                self.sp = new_value;
+                (self.pc.wrapping_add(2), 16)
+            }
     }
   }
 
@@ -1548,7 +1644,7 @@ impl CPU {
     pub fn add_hl(&mut self, value: u16) -> u16 {
         let hl = self.registers.get_hl();
         let (new_value, did_overflow) = hl.overflowing_add(value);
-        self.registers.f.zero = new_value == 0;
+        
         self.registers.f.subtract = false;
         self.registers.f.carry = did_overflow;
         // Half carry tests if the sum of the lower three nibbles of the value and the register(s)
@@ -1560,7 +1656,7 @@ impl CPU {
 
     pub fn adc(&mut self, value: u8) -> u8 {
         let (new_value, did_overflow) = self.registers.a.overflowing_add(value);
-        let (newer_value, did_overflow2) = self.registers.a.overflowing_add(did_overflow as u8);
+        let (newer_value, did_overflow2) = new_value.overflowing_add(self.registers.f.carry as u8);
 
         self.registers.f.zero = new_value == 0;
         self.registers.f.subtract = false;
@@ -1576,19 +1672,19 @@ impl CPU {
         self.registers.f.zero = new_value == 0;
         self.registers.f.subtract = true;
         self.registers.f.carry = did_overflow;
-        self.registers.f.half_carry = ((self.registers.a & 0xF) as i32) - ((value & 0xF) as i32) < 0;
+        self.registers.f.half_carry = (self.registers.a & 0xF) < (value & 0xF);
 
         new_value
     }
 
     pub fn sbc(&mut self, value: u8) -> u8 {
         let (new_value, did_overflow) = self.registers.a.overflowing_sub(value);
-        let (newer_value, did_overflow2) = self.registers.a.overflowing_sub(did_overflow as u8);
+        let (newer_value, did_overflow2) = new_value.overflowing_sub(self.registers.f.carry as u8);
 
         self.registers.f.zero = new_value == 0;
         self.registers.f.subtract = true;
         self.registers.f.carry = did_overflow | did_overflow2;
-        self.registers.f.half_carry = ((self.registers.a & 0xF) as i32) - ((value & 0xF) as i32) < 0;
+        self.registers.f.half_carry = (self.registers.a & 0xF) < (value & 0xF) + (self.registers.f.carry as u8);
 
         newer_value
     }
@@ -1720,12 +1816,12 @@ impl CPU {
         new_value
     }
 
-    pub fn rotate_r_flag(&mut self, value: u8) -> u8 {
+    pub fn rotate_r_flag(&mut self, value: u8, zero: bool) -> u8 {
         let b0 = value & 0b00000001;
         let transfer_bit = (self.registers.f.carry as u8) << 7;
         let new_value = transfer_bit | (value >> 1);
 
-        self.registers.f.zero = new_value == 0;
+        self.registers.f.zero = zero && new_value == 0;
         self.registers.f.subtract = false;
         self.registers.f.half_carry = false;
         self.registers.f.carry = b0 != 0;
@@ -1733,12 +1829,12 @@ impl CPU {
         new_value
     }
 
-    pub fn rotate_l_flag(&mut self, value: u8) -> u8 {
+    pub fn rotate_l_flag(&mut self, value: u8, zero: bool) -> u8 {
         let b7 = value & 0b10000000;
         let transfer_bit = self.registers.f.carry as u8;
         let new_value = (value << 1) | transfer_bit;
 
-        self.registers.f.zero = new_value == 0;
+        self.registers.f.zero = zero && new_value == 0;
         self.registers.f.subtract = false;
         self.registers.f.half_carry = false;
         self.registers.f.carry = b7 != 0;
@@ -1746,12 +1842,12 @@ impl CPU {
         new_value
     }
 
-    pub fn rotate_r(&mut self, value: u8) -> u8 {
+    pub fn rotate_r(&mut self, value: u8, zero: bool) -> u8 {
         let b0 = value & 0b00000001;
         let transfer_bit = b0 << 7;
         let new_value = transfer_bit | (value >> 1);
 
-        self.registers.f.zero = new_value == 0;
+        self.registers.f.zero = zero && new_value == 0;
         self.registers.f.subtract = false;
         self.registers.f.half_carry = false;
         self.registers.f.carry = b0 != 0;
@@ -1759,12 +1855,12 @@ impl CPU {
         new_value
     }
 
-    pub fn rotate_l(&mut self, value: u8) -> u8 {
+    pub fn rotate_l(&mut self, value: u8, zero: bool) -> u8 {
         let b7 = value & 0b10000000;
         let transfer_bit = b7 >> 7;
         let new_value = (value << 1) | transfer_bit;
 
-        self.registers.f.zero = new_value == 0;
+        self.registers.f.zero = zero && new_value == 0;
         self.registers.f.subtract = false;
         self.registers.f.half_carry = false;
         self.registers.f.carry = b7 != 0;
@@ -1809,11 +1905,9 @@ impl CPU {
     }
 
     pub fn jump(&self, should_jump: bool) -> (u16, u8) {
+        
         if should_jump {
-            let least_significant_byte = self.bus.read_byte(self.pc + 1) as u16;
-            let most_significant_byte = self.bus.read_byte(self.pc + 2) as u16;
-
-            ((most_significant_byte << 8) | least_significant_byte, 16)
+            (self.read_next_word(), 16)
         } else {
             (self.pc.wrapping_add(3), 12)
         }
@@ -1833,5 +1927,30 @@ impl CPU {
         } else {
             (next_pc, 8)
         }
+    }
+
+    pub fn decimal_adjust(&mut self, value: u8) -> u8 {
+        let mut offset: u8 = 0;
+        let mut carry: bool = false;
+
+        if (!self.registers.f.subtract && (self.registers.a & 0xF) > 0x09) || self.registers.f.half_carry {
+            offset += 0x06;
+        }
+        if (!self.registers.f.subtract && self.registers.a > 0x99) || self.registers.f.carry {
+            offset += 0x60;
+            carry = true;
+        }
+
+        let new_value = if self.registers.f.subtract {
+            self.registers.a.wrapping_sub(offset)
+        } else {
+            self.registers.a.wrapping_add(offset)
+        };
+
+        self.registers.f.zero = new_value == 0;
+        self.registers.f.half_carry = false;
+        self.registers.f.carry = carry;
+
+        new_value
     }
 }

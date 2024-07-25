@@ -10,6 +10,7 @@ pub enum Instruction {
     OR(ArithmeticTarget),
     XOR(ArithmeticTarget),
     CP(ArithmeticTarget),
+    ADDSP,
 
     INC(IncDecTarget),
     DEC(IncDecTarget),
@@ -17,6 +18,7 @@ pub enum Instruction {
     CCF,
     SCF,
     CPL,
+    DAA,
 
     RLCA,
     RLA,
@@ -52,7 +54,9 @@ pub enum Instruction {
 
     // Control Instructions
     HALT,
-    NOP
+    NOP,
+    DI,
+    EI
 }
 #[derive(Debug)]
 pub enum ArithmeticTarget {
@@ -111,7 +115,7 @@ pub enum Indirect {
 }
 #[derive(Debug)]
 pub enum LoadType {
-  Byte(LoadByteTarget, LoadByteSource), Word(LoadWordTarget), AFromIndirect(Indirect), IndirectFromA(Indirect), AFromByteAddress, ByteAddressFromA
+  Byte(LoadByteTarget, LoadByteSource), Word(LoadWordTarget), AFromIndirect(Indirect), IndirectFromA(Indirect), AFromByteAddress, ByteAddressFromA, SPFromHL, WordFromSP, HLFromSPPlus
 }
 #[derive(Debug)]
 pub enum StackTarget {
@@ -469,7 +473,7 @@ impl Instruction {
             0xA3 => Some(Instruction::AND(ArithmeticTarget::E)),
             0xB3 => Some(Instruction::OR(ArithmeticTarget::E)),
             0xC3 => Some(Instruction::JP(JumpTest::Always)),
-            //0xF3 =>
+            0xF3 => Some(Instruction::DI),
 
             0x04 => Some(Instruction::INC(IncDecTarget::B)),
             0x14 => Some(Instruction::INC(IncDecTarget::D)),
@@ -522,7 +526,7 @@ impl Instruction {
 
             0x07 => Some(Instruction::RLCA),
             0x17 => Some(Instruction::RLA),
-            //0x27 =>
+            0x27 => Some(Instruction::DAA),
             0x37 => Some(Instruction::SCF),
             0x47 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::A))),
             0x57 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::A))),
@@ -537,7 +541,7 @@ impl Instruction {
             //0xE7 =>
             //0xF7 =>
 
-            //0x08 => 
+            0x08 => Some(Instruction::LD(LoadType::WordFromSP)),
             0x18 => Some(Instruction::JR(JumpTest::Always)),
             0x28 => Some(Instruction::JR(JumpTest::Zero)),
             0x38 =>Some(Instruction::JR(JumpTest::Carry)),
@@ -551,8 +555,8 @@ impl Instruction {
             0xB8 => Some(Instruction::CP(ArithmeticTarget::B)),
             0xC8 => Some(Instruction::RET(JumpTest::Zero)),
             0xD8 => Some(Instruction::RET(JumpTest::Carry)),
-            //0xE8 =>
-            //0xF8 =>
+            0xE8 => Some(Instruction::ADDSP),
+            0xF8 => Some(Instruction::LD(LoadType::HLFromSPPlus)),
 
             0x09 => Some(Instruction::ADDHL(ADDHLTarget::BC)),
             0x19 => Some(Instruction::ADDHL(ADDHLTarget::DE)),
@@ -569,7 +573,7 @@ impl Instruction {
             0xC9 => Some(Instruction::RET(JumpTest::Always)),
             //0xD9 =>
             0xE9 => Some(Instruction::JPI),
-            //0xF9 => 
+            0xF9 => Some(Instruction::LD(LoadType::SPFromHL)), 
 
             0x0A => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::BCIndirect))),
             0x1A => Some(Instruction::LD(LoadType::AFromIndirect(Indirect::DEIndirect))),
@@ -600,7 +604,7 @@ impl Instruction {
             0x9B => Some(Instruction::SBC(ArithmeticTarget::E)),
             0xAB => Some(Instruction::XOR(ArithmeticTarget::E)),
             0xBB => Some(Instruction::CP(ArithmeticTarget::E)),
-            //0xFB =>
+            0xFB => Some(Instruction::EI),
 
             0x0C => Some(Instruction::INC(IncDecTarget::C)),
             0x1C => Some(Instruction::INC(IncDecTarget::E)),

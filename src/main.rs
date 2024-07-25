@@ -7,6 +7,7 @@ use std::io::Read;
 mod cpu;
 mod gpu;
 mod memory_bus;
+mod interrupt_flag;
 
 fn main() {
     let boot_rom_path = "./roms/dmg_boot.bin";
@@ -18,21 +19,21 @@ fn main() {
     let mut _cpu = cpu::CPU::new(boot_rom, game_rom);
     println!("ok!");
 
-    let mut cycles : u32 = 0; // Using u32 for testing purposes
-
+    let mut cycles : u64 = 0; // Using u64 for testing purposes
+    let mut file = std::fs::File::create("./logs/log.txt").expect("Error");
     while true {
-        println!("Current program counter: 0x{:x}. Current cyle: {}. Current stack pointer: 0x{:x}. A register: 0x{:x}. B register: 0x{:x}. C register: 0x{:x}. D register: 0x{:x}. E register: 0x{:x} H register: 0x{:x}. F register: 0x{:x}{:x}{:x}{:x}.", _cpu.pc, cycles, _cpu.sp, _cpu.registers.a, _cpu.registers.b, _cpu.registers.c, _cpu.registers.d, _cpu.registers.e, _cpu.registers.h, _cpu.registers.f.carry as u8, _cpu.registers.f.half_carry as u8, _cpu.registers.f.subtract as u8, _cpu.registers.f.zero as u8);
 
         if _cpu.pc >= 0x100 && _cpu.is_booted == false {
-            println!("");
-            println!(" S U C C E S S ");
-            println!("Boot successfuly completed! Exiting...");
             _cpu.is_booted = true;
-            std::process::exit(0)
+            println!(""); // 329480 CPU cycles later
+            println!(" S U C C E S S ");
+            println!("Boot successfuly completed! Continuing...");
+            //std::process::exit(0)
         }
 
         if !_cpu.is_halted {
-            cycles += _cpu.step() as u32;
+            cycles += _cpu.step() as u64;
+            if cycles > 0 { cycles = 0; }
         } else {
             println!("PAUSE");
         }
