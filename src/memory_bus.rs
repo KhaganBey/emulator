@@ -37,7 +37,7 @@ pub const UNUSED_END: usize = 0xFEFF;
 
 pub const IO_REGISTERS_BEGIN: usize = 0xFF00;
 pub const IO_REGISTERS_END: usize = 0xFF7F;
-pub const IO_REGISTERS_SIZE: usize = IO_REGISTERS_END - IO_REGISTERS_BEGIN;
+pub const IO_REGISTERS_SIZE: usize = IO_REGISTERS_END - IO_REGISTERS_BEGIN + 1;
 
 pub const ZERO_PAGE_BEGIN: usize = 0xFF80;
 pub const ZERO_PAGE_END: usize = 0xFFFE;
@@ -147,6 +147,9 @@ impl MemoryBus {
             WORKING_RAM_BEGIN ..= WORKING_RAM_END => {
                 self.working_ram[address - WORKING_RAM_BEGIN] = byte;
             }
+            ECHO_RAM_BEGIN ..= ECHO_RAM_END => {
+                self.working_ram[address - ECHO_RAM_BEGIN] = byte;
+            }
             OAM_BEGIN ..= OAM_END => {
                 self.oam_temp[address - OAM_BEGIN] = byte;
             }
@@ -189,6 +192,7 @@ impl MemoryBus {
             //0xFF40 => { /* LCD Control */ }
             //0xFF42 => { /* Viewport Y Offset */ }
             //0xFF47 => { /* Background Colors Setting */ }
+            0xFF7F => { /* Nothing */ }
             _ => {
                 self.io_temp[address - IO_REGISTERS_BEGIN] = byte;
             }
