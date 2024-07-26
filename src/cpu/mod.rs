@@ -214,13 +214,13 @@ impl CPU {
             Instruction::ADDHL(target) => { 
                 match target {
                     ADDHLTarget::BC => {
-                        let value = self.registers.get_hl();
+                        let value = self.registers.get_bc();
                         let new_value = self.add_hl(value);
                         self.registers.set_hl(new_value);
                         (self.pc.wrapping_add(1), 8)
                     }
                     ADDHLTarget::DE => {
-                        let value = self.registers.get_hl();
+                        let value = self.registers.get_de();
                         let new_value = self.add_hl(value);
                         self.registers.set_hl(new_value);
                         (self.pc.wrapping_add(1), 8)
@@ -1660,8 +1660,8 @@ impl CPU {
 
         self.registers.f.zero = new_value == 0;
         self.registers.f.subtract = false;
+        self.registers.f.half_carry = (value & 0xF) + (self.registers.a & 0xF) + (self.registers.f.carry as u8) > 0xF;
         self.registers.f.carry = did_overflow | did_overflow2;
-        self.registers.f.half_carry = (value & 0xF) + (self.registers.a & 0xF) > 0xF;
 
         newer_value
     }
@@ -1683,8 +1683,8 @@ impl CPU {
 
         self.registers.f.zero = new_value == 0;
         self.registers.f.subtract = true;
-        self.registers.f.carry = did_overflow | did_overflow2;
         self.registers.f.half_carry = (self.registers.a & 0xF) < (value & 0xF) + (self.registers.f.carry as u8);
+        self.registers.f.carry = did_overflow | did_overflow2;
 
         newer_value
     }
@@ -1871,24 +1871,20 @@ impl CPU {
     pub fn bit_test(&mut self, value: u8, bit_pos: BitPosition) {
         let position : u8 = bit_pos.into();
         let bit = (value >> position) & 0b1;
-        self.registers.f.zero = bit != 0;
 
+        self.registers.f.zero = bit != 0;
         self.registers.f.subtract = false;
         self.registers.f.half_carry = true;
     }
 
     pub fn bit_set(&mut self, value: u8, bit_pos: BitPosition) -> u8 {
         let position : u8 = bit_pos.into();
-        let new_value = value | (0b00000001 << position);
-
-        new_value
+        value | (1 << position)
     }
 
     pub fn bit_reset(&mut self, value: u8, bit_pos: BitPosition) -> u8 {
         let position : u8 = bit_pos.into();
-        let new_value = value & !(0b00000001 << position);
-
-        new_value
+        value & !(1 << position)
     }
 
     pub fn swap(&mut self, value: u8) -> u8 {
@@ -1931,25 +1927,21 @@ impl CPU {
 
     pub fn decimal_adjust(&mut self, value: u8) -> u8 {
         let mut offset: u8 = 0;
-        let mut carry: bool = false;
 
-        if (!self.registers.f.subtract && (self.registers.a & 0xF) > 0x09) || self.registers.f.half_carry {
-            offset += 0x06;
-        }
-        if (!self.registers.f.subtract && self.registers.a > 0x99) || self.registers.f.carry {
-            offset += 0x60;
-            carry = true;
+        if self.registers.f.half_carry || ((value & 0x0F) > 0x09 && !self.registers.f.subtract) {
+            offset |= 0x06;
         }
 
-        let new_value = if self.registers.f.subtract {
-            self.registers.a.wrapping_sub(offset)
-        } else {
-            self.registers.a.wrapping_add(offset)
-        };
+        if self.registers.f.carry || (value > 0x99 && !self.registers.f.subtract) {
+            offset |= 0x60;
+            self.registers.f.carry = true;
+        }
 
+        let new_value: u8 = if self.registers.f.subtract { value.wrapping_sub(offset) } else { value.wrapping_add(offset) };
+
+        //println!("0x{:x} to 0x{:x} when zero: {}, sub: {}, hc: {}, c: {}", value, new_value, self.registers.f.zero, self.registers.f.subtract, self.registers.f.half_carry, self.registers.f.carry);
         self.registers.f.zero = new_value == 0;
         self.registers.f.half_carry = false;
-        self.registers.f.carry = carry;
 
         new_value
     }

@@ -177,9 +177,9 @@ impl MemoryBus {
 
     fn write_io(&mut self, address: usize, byte: u8) {
         match address {
-            0xFF00 => { /* joypad */ print!("{}",byte as char); }
-            0xFF01 => { /* Serial Transfer */ print!("{}",byte as char); }
-            //0xFF02 => { /* Serial Transfer Control */ }
+            0xFF00 => { /* joypad */ print!("{}", byte as char); }
+            0xFF01 => { /* Serial Transfer */ print!("{}", byte as char); }
+            0xFF02 => { /* Serial Transfer Control */ print!("{}", byte as char); }
             0xFF0F => self.interrupt_flag.from_byte(byte),
             //0xFF11 => { /* Channel 1 Sound Length and Wave */ }
             //0xFF12 => { /* Channel 1 Sound Control */ }
