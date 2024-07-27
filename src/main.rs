@@ -9,6 +9,7 @@ mod cpu;
 mod gpu;
 mod memory_bus;
 mod interrupt_flag;
+mod timer;
 
 use cpu::instructions::Instruction;
 use cpu::flags_register::FlagsRegister;
@@ -44,13 +45,15 @@ fn main() {
 
     println!("ok!");
 
-    let mut cycles : u64 = 0; // Using u64 for testing purposes
+    let mut cycles : u8 = 0;
     
     match mode {
         Mode::Boot =>{
-            let mut _cpu = cpu::CPU::new(boot_rom, game_rom);
+            let memory_bus = memory_bus::MemoryBus::new(boot_rom, game_rom);
+            let mut _cpu = cpu::CPU::new(memory_bus);
+            let mut timer = timer::Timer::new(_cpu);
             loop {
-                if _cpu.pc >= 0x100 {
+                if timer.cpu.pc >= 0x100 {
                     println!(""); // 329480 CPU cycles later
                     println!(" S U C C E S S ");
                     println!("Boot successfuly completed! Exiting...");
@@ -58,23 +61,29 @@ fn main() {
                     std::process::exit(0)
                 }
 
-                cycles += _cpu.step() as u64;
+                cycles = timer.cpu.step();
+                timer.ticks(cycles);
+                cycles = 0;
             }
         }
 
         Mode::Main => {
-            let mut _cpu = cpu::CPU::new(boot_rom, game_rom);
+            let memory_bus = memory_bus::MemoryBus::new(boot_rom, game_rom);
+            let mut _cpu = cpu::CPU::new(memory_bus);
+            let mut timer = timer::Timer::new(_cpu);
             loop {
-                if _cpu.pc >= 0x100 && _cpu.is_booted == false {
-                    _cpu.is_booted = true;
+                if timer.cpu.pc >= 0x100 && timer.cpu.is_booted == false {
+                    timer.cpu.is_booted = true;
                     println!(""); // 329480 CPU cycles later
                     println!(" S U C C E S S ");
                     println!("Boot successfuly completed! Continuing...");
                     println!("");
                 }
             
-                if !_cpu.is_halted {
-                    cycles += _cpu.step() as u64;
+                if !timer.cpu.is_halted {
+                    cycles = timer.cpu.step();
+                    timer.ticks(cycles);
+                    cycles = 0;
                 } else {
                     println!("PAUSE");
                 }
@@ -84,32 +93,37 @@ fn main() {
         // This mode writes emulator state to a log file after every instruction
         // Change log path to ensure your old logs don't get overwritten
         Mode::Debug => {
-            let mut _cpu = cpu::CPU::new(boot_rom, game_rom);
+            let memory_bus = memory_bus::MemoryBus::new(boot_rom, game_rom);
+            let mut _cpu = cpu::CPU::new(memory_bus);
+            let mut timer = timer::Timer::new(_cpu);
             let mut file = std::fs::File::create("./logs/log_7.txt").expect("error creating file");
 
             loop {
-                if _cpu.pc >= 0x100 && _cpu.is_booted == false {
-                    _cpu.is_booted = true;
+                if timer.cpu.pc >= 0x100 && timer.cpu.is_booted == false {
+                    timer.cpu.is_booted = true;
                     println!(""); // 329480 CPU cycles later
                     println!(" S U C C E S S ");
                     println!("Boot successfuly completed! Continuing...");
-                    writeln!(&mut file, "A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})", _cpu.registers.a, u8::from(_cpu.registers.f), _cpu.registers.b, _cpu.registers.c, _cpu.registers.d, _cpu.registers.e, _cpu.registers.h, _cpu.registers.l, _cpu.sp, _cpu.pc, _cpu.bus.read_byte(_cpu.pc), _cpu.bus.read_byte(_cpu.pc + 1), _cpu.bus.read_byte(_cpu.pc + 2), _cpu.bus.read_byte(_cpu.pc + 3)).expect("error logging to file");
+                    writeln!(&mut file, "A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})", timer.cpu.registers.a, u8::from(timer.cpu.registers.f), timer.cpu.registers.b, timer.cpu.registers.c, timer.cpu.registers.d, timer.cpu.registers.e, timer.cpu.registers.h, timer.cpu.registers.l, timer.cpu.sp, timer.cpu.pc, timer.cpu.bus.read_byte(timer.cpu.pc), timer.cpu.bus.read_byte(timer.cpu.pc + 1), timer.cpu.bus.read_byte(timer.cpu.pc + 2), timer.cpu.bus.read_byte(timer.cpu.pc + 3)).expect("error logging to file");
                 }
             
-                if !_cpu.is_halted {
-                    cycles += _cpu.step() as u64;
-                    if cycles > 0 { cycles = 0; }
-                    if _cpu.is_booted { writeln!(&mut file, "A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})", _cpu.registers.a, u8::from(_cpu.registers.f), _cpu.registers.b, _cpu.registers.c, _cpu.registers.d, _cpu.registers.e, _cpu.registers.h, _cpu.registers.l, _cpu.sp, _cpu.pc, _cpu.bus.read_byte(_cpu.pc), _cpu.bus.read_byte(_cpu.pc + 1), _cpu.bus.read_byte(_cpu.pc + 2), _cpu.bus.read_byte(_cpu.pc + 3)).expect("error logging to file"); }
+                if !timer.cpu.is_halted {
+                    cycles = timer.cpu.step();
+                    timer.ticks(cycles);
+                    cycles = 0;
+                    if timer.cpu.is_booted { writeln!(&mut file, "A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})", timer.cpu.registers.a, u8::from(timer.cpu.registers.f), timer.cpu.registers.b, timer.cpu.registers.c, timer.cpu.registers.d, timer.cpu.registers.e, timer.cpu.registers.h, timer.cpu.registers.l, timer.cpu.sp, timer.cpu.pc, timer.cpu.bus.read_byte(timer.cpu.pc), timer.cpu.bus.read_byte(timer.cpu.pc + 1), timer.cpu.bus.read_byte(timer.cpu.pc + 2), timer.cpu.bus.read_byte(timer.cpu.pc + 3)).expect("error logging to file"); }
                 } else {
                     println!("PAUSE");
                 }
             }
         }
-
+        Mode::Test => {}
         // This mode is still a WIP, not sure if it will ever get finished
-        Mode::Test => {
+        /*Mode::Test => {
             let test_rom: Vec<u8> = Vec::new();
-            let mut _cpu = cpu::CPU::new(boot_rom, test_rom);
+            let mut memory_bus = memory_bus::MemoryBus::new(boot_rom, game_rom);
+            let mut timer.cpu = cpu::CPU::new(memory_bus);
+            let mut timer = timer::Timer::new(memory_bus);
             println!("Instruction Tests Starting");
 
             for n in 0x00..10 {
@@ -134,29 +148,29 @@ fn main() {
                         for t in 0..tests.len() {
                             println!("Executing test {} at {}", tests[t]["name"], test_path);
                             // Initialise the cpu
-                            _cpu.registers.a = JsonValue::as_u8(&tests[t]["initial"]["a"]).expect("Is value a u8?");
-                            _cpu.registers.b = JsonValue::as_u8(&tests[t]["initial"]["b"]).expect("Is value a u8?");
-                            _cpu.registers.c = JsonValue::as_u8(&tests[t]["initial"]["c"]).expect("Is value a u8?");
-                            _cpu.registers.d = JsonValue::as_u8(&tests[t]["initial"]["d"]).expect("Is value a u8?");
-                            _cpu.registers.e = JsonValue::as_u8(&tests[t]["initial"]["e"]).expect("Is value a u8?");
-                            _cpu.registers.h = JsonValue::as_u8(&tests[t]["initial"]["h"]).expect("Is value a u8?");
-                            _cpu.registers.l = JsonValue::as_u8(&tests[t]["initial"]["l"]).expect("Is value a u8?");
-                            _cpu.registers.f = FlagsRegister::from(JsonValue::as_u8(&tests[t]["initial"]["f"]).expect("Is value a flags register?"));
-                            _cpu.pc = JsonValue::as_u16(&tests[t]["initial"]["pc"]).expect("Is value a u16?");
-                            _cpu.sp = JsonValue::as_u16(&tests[t]["initial"]["sp"]).expect("Is value a u16?");
+                            timer.cpu.registers.a = JsonValue::as_u8(&tests[t]["initial"]["a"]).expect("Is value a u8?");
+                            timer.cpu.registers.b = JsonValue::as_u8(&tests[t]["initial"]["b"]).expect("Is value a u8?");
+                            timer.cpu.registers.c = JsonValue::as_u8(&tests[t]["initial"]["c"]).expect("Is value a u8?");
+                            timer.cpu.registers.d = JsonValue::as_u8(&tests[t]["initial"]["d"]).expect("Is value a u8?");
+                            timer.cpu.registers.e = JsonValue::as_u8(&tests[t]["initial"]["e"]).expect("Is value a u8?");
+                            timer.cpu.registers.h = JsonValue::as_u8(&tests[t]["initial"]["h"]).expect("Is value a u8?");
+                            timer.cpu.registers.l = JsonValue::as_u8(&tests[t]["initial"]["l"]).expect("Is value a u8?");
+                            timer.cpu.registers.f = FlagsRegister::from(JsonValue::as_u8(&tests[t]["initial"]["f"]).expect("Is value a flags register?"));
+                            timer.cpu.pc = JsonValue::as_u16(&tests[t]["initial"]["pc"]).expect("Is value a u16?");
+                            timer.cpu.sp = JsonValue::as_u16(&tests[t]["initial"]["sp"]).expect("Is value a u16?");
                             
                             // Initialise the memory
                             for m in 0..tests[t]["initial"]["ram"].len() {
                                 let address = JsonValue::as_u16(&tests[t]["initial"]["ram"][m][0]).expect("Is value a u16 memory address?");
                                 let byte = JsonValue::as_u8(&tests[t]["initial"]["ram"][m][1]).expect("Is value a u8?");
-                                _cpu.bus.write_byte(address, byte);
+                                timer.cpu.bus.write_byte(address, byte);
                             }
 
                             // Run the test
                             let mut cycle: usize = 0;
                             let mut loopy = 0;
                             loop {
-                                cycle += (_cpu.step() / 4) as usize;
+                                cycle += (timer.cpu.step() / 4) as usize;
                                 loopy += 1;
                                 println!("{}", cycle);
                                 if !(tests[t]["cycles"][loopy].is_null()) { 
@@ -166,27 +180,27 @@ fn main() {
                                 
                                     match _type {
                                         "read" => {
-                                            let byte = _cpu.bus.read_byte(address);
+                                            let byte = timer.cpu.bus.read_byte(address);
                                             println!("Just read byte 0x{:x} at address 0x{:4x}. The value given is {}", byte, address, value);
                                         }
                                         "write" => {
-                                            _cpu.bus.write_byte(address, value);
+                                            timer.cpu.bus.write_byte(address, value);
                                             println!("Just written byte 0x{:x} at address 0x{:4x}.", value, address);
                                         }
                                         _ => { println!("This cycle's bus operation could not be retrieved."); }
                                     }
                                 } else if loopy >= tests[t]["cycles"].len() {
                                     // Check emulator state with expected
-                                    if !(_cpu.registers.a == JsonValue::as_u8(&tests[t]["final"]["a"]).expect("Is value a u8?")) { panic!("Error: register a wrong: 0x{:x}", _cpu.registers.a) }
-                                    if !(_cpu.registers.b == JsonValue::as_u8(&tests[t]["final"]["b"]).expect("Is value a u8?")) { panic!("Error: register b wrong") }
-                                    if !(_cpu.registers.c == JsonValue::as_u8(&tests[t]["final"]["c"]).expect("Is value a u8?")) { panic!("Error: register c wrong") }
-                                    if !(_cpu.registers.d == JsonValue::as_u8(&tests[t]["final"]["d"]).expect("Is value a u8?")) { panic!("Error: register d wrong") }
-                                    if !(_cpu.registers.e == JsonValue::as_u8(&tests[t]["final"]["e"]).expect("Is value a u8?")) { panic!("Error: register e wrong") }
-                                    if !(_cpu.registers.h == JsonValue::as_u8(&tests[t]["final"]["h"]).expect("Is value a u8?")) { panic!("Error: register h wrong") }
-                                    if !(_cpu.registers.l == JsonValue::as_u8(&tests[t]["final"]["l"]).expect("Is value a u8?")) { panic!("Error: register l wrong: 0x{:x}", _cpu.registers.l) }
-                                    if !(_cpu.registers.f == FlagsRegister::from(JsonValue::as_u8(&tests[t]["final"]["f"]).expect("Is value a flags register?"))) { println!("Error: flags register wrong") }
-                                    if !(_cpu.pc == JsonValue::as_u16(&tests[t]["final"]["pc"]).expect("Is value a u16?")) { panic!("Error: pc wrong") }
-                                    if !(_cpu.sp == JsonValue::as_u16(&tests[t]["final"]["sp"]).expect("Is value a u16?")) { panic!("Error: sp wrong") }
+                                    if !(timer.cpu.registers.a == JsonValue::as_u8(&tests[t]["final"]["a"]).expect("Is value a u8?")) { panic!("Error: register a wrong: 0x{:x}", timer.cpu.registers.a) }
+                                    if !(timer.cpu.registers.b == JsonValue::as_u8(&tests[t]["final"]["b"]).expect("Is value a u8?")) { panic!("Error: register b wrong") }
+                                    if !(timer.cpu.registers.c == JsonValue::as_u8(&tests[t]["final"]["c"]).expect("Is value a u8?")) { panic!("Error: register c wrong") }
+                                    if !(timer.cpu.registers.d == JsonValue::as_u8(&tests[t]["final"]["d"]).expect("Is value a u8?")) { panic!("Error: register d wrong") }
+                                    if !(timer.cpu.registers.e == JsonValue::as_u8(&tests[t]["final"]["e"]).expect("Is value a u8?")) { panic!("Error: register e wrong") }
+                                    if !(timer.cpu.registers.h == JsonValue::as_u8(&tests[t]["final"]["h"]).expect("Is value a u8?")) { panic!("Error: register h wrong") }
+                                    if !(timer.cpu.registers.l == JsonValue::as_u8(&tests[t]["final"]["l"]).expect("Is value a u8?")) { panic!("Error: register l wrong: 0x{:x}", timer.cpu.registers.l) }
+                                    if !(timer.cpu.registers.f == FlagsRegister::from(JsonValue::as_u8(&tests[t]["final"]["f"]).expect("Is value a flags register?"))) { println!("Error: flags register wrong") }
+                                    if !(timer.cpu.pc == JsonValue::as_u16(&tests[t]["final"]["pc"]).expect("Is value a u16?")) { panic!("Error: pc wrong") }
+                                    if !(timer.cpu.sp == JsonValue::as_u16(&tests[t]["final"]["sp"]).expect("Is value a u16?")) { panic!("Error: sp wrong") }
                                 
                                     println!("passed");
                                     break
@@ -196,7 +210,7 @@ fn main() {
                     }
                 }
             }
-        }
+        }*/
     }
 }
 

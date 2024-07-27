@@ -36,15 +36,15 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub fn new(boot_rom: Vec<u8>, game_rom: Vec<u8>) -> CPU {
+    pub fn new(bus: MemoryBus) -> CPU {
         CPU {
             registers: Registers::new(),
             pc: 0x00,
             sp: 0x00,
-            bus: MemoryBus::new(boot_rom, game_rom),
+            bus: bus,
             is_halted: false,
             is_booted: false,
-            ime: true
+            ime: false
         }
     }
 

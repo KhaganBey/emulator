@@ -26,14 +26,11 @@ impl InterruptFlag {
     } 
 
     pub fn to_byte(&self) -> u8 {
-        let mut byte = 0b00000000;
-
-        byte = byte & (self.vblank as u8);
-        byte = byte & ((self.stat as u8) << 1);
-        byte = byte & ((self.timer as u8) << 2);
-        byte = byte & ((self.serial as u8) << 3);
-        byte = byte & ((self.joypad as u8) << 4);
-
-        byte
+        0b11110000 |
+        ((self.joypad as u8) << 4) |
+        ((self.serial as u8) << 3) |
+        ((self.timer as u8) << 2) |
+        ((self.stat as u8) << 1) |
+        (self.vblank as u8)
     }
 }
