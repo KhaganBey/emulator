@@ -68,10 +68,12 @@ impl MemoryBus {
         
         let mut rom_bank_0 = [0; ROM_BANK_0_SIZE];
         for i in 0 ..= ROM_BANK_0_SIZE - 1 {
+            if i == game_rom.len() { break }
             rom_bank_0[i] = game_rom[i];
         }
         let mut rom_bank_n = [0; ROM_BANK_N_SIZE];
         for i in 0 ..= ROM_BANK_N_SIZE - 1 {
+            if i == game_rom.len() { break }
             rom_bank_n[i] = game_rom[ROM_BANK_0_SIZE + i];
         }
 
@@ -93,7 +95,7 @@ impl MemoryBus {
         }
     }
 
-    pub fn step(&mut self, cycles: u8) {
+    pub fn step(&mut self, cycles: u8, pc: u16) {
         //
     }
 
@@ -133,10 +135,13 @@ impl MemoryBus {
 
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         let address = address as usize;
-
+        
         match address {
             ROM_BANK_0_BEGIN ..= ROM_BANK_0_END => {
                 self.rom_bank_0[address] = byte;
+            }
+            ROM_BANK_N_BEGIN ..= ROM_BANK_N_END => {
+                self.rom_bank_n[address - ROM_BANK_N_BEGIN] = byte;
             }
             VRAM_BEGIN ..= VRAM_END => {
                 self.gpu.write_vram(address - VRAM_BEGIN, byte)
@@ -171,7 +176,7 @@ impl MemoryBus {
             0xFF0F => self.interrupt_flag.to_byte(),
             //0xFF40 => { /* LCD Control */ 0 }
             //0xFF42 => { /* Scroll Y Position */ 0 }
-            0xFF44 => { self.io_temp[address - IO_REGISTERS_BEGIN] }
+            //0xFF44 => { self.io_temp[address - IO_REGISTERS_BEGIN] }
             _ => {
                 self.io_temp[address - IO_REGISTERS_BEGIN]
             }
@@ -182,7 +187,7 @@ impl MemoryBus {
         match address {
             0xFF00 => { /* joypad */ print!("{}", byte as char); }
             0xFF01 => { /* Serial Transfer */ print!("{}", byte as char); }
-            0xFF02 => { /* Serial Transfer Control */ print!("{}", byte as char); }
+            0xFF02 => { /* Serial Transfer Control */ }
             0xFF0F => self.interrupt_flag.from_byte(byte),
             //0xFF11 => { /* Channel 1 Sound Length and Wave */ }
             //0xFF12 => { /* Channel 1 Sound Control */ }

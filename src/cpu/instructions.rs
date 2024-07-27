@@ -51,6 +51,7 @@ pub enum Instruction {
     POP(StackTarget),
     CALL(JumpTest),
     RET(JumpTest),
+    RST(RSTLocation),
 
     // Control Instructions
     HALT,
@@ -120,6 +121,33 @@ pub enum LoadType {
 #[derive(Debug)]
 pub enum StackTarget {
     AF, BC, DE, HL,
+}
+
+#[derive(Debug)]
+pub enum RSTLocation {
+    X00,
+    X08,
+    X10,
+    X18,
+    X20,
+    X28,
+    X30,
+    X38,
+}
+
+impl RSTLocation {
+    pub fn to_hex(&self) -> u16 {
+        match self {
+            RSTLocation::X00 => 0x00,
+            RSTLocation::X08 => 0x08,
+            RSTLocation::X10 => 0x10,
+            RSTLocation::X18 => 0x18,
+            RSTLocation::X20 => 0x20,
+            RSTLocation::X28 => 0x28,
+            RSTLocation::X30 => 0x30,
+            RSTLocation::X38 => 0x38,
+        }
+    }
 }
 
 impl Instruction {
@@ -493,7 +521,7 @@ impl Instruction {
             0x05 => Some(Instruction::DEC(IncDecTarget::B)),
             0x15 => Some(Instruction::DEC(IncDecTarget::D)),
             0x25 => Some(Instruction::DEC(IncDecTarget::H)),
-            0x35 => Some(Instruction::INC(IncDecTarget::HLI)),
+            0x35 => Some(Instruction::DEC(IncDecTarget::HLI)),
             0x45 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::B, LoadByteSource::L))),
             0x55 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::D, LoadByteSource::L))),
             0x65 => Some(Instruction::LD(LoadType::Byte(LoadByteTarget::H, LoadByteSource::L))),
@@ -536,10 +564,10 @@ impl Instruction {
             0x97 => Some(Instruction::SUB(ArithmeticTarget::A)),
             0xA7 => Some(Instruction::AND(ArithmeticTarget::A)),
             0xB7 => Some(Instruction::OR(ArithmeticTarget::A)),
-            //0xC7 =>
-            //0xD7 =>
-            //0xE7 =>
-            //0xF7 =>
+            0xC7 => Some(Instruction::RST(RSTLocation::X00)),
+            0xD7 => Some(Instruction::RST(RSTLocation::X10)),
+            0xE7 => Some(Instruction::RST(RSTLocation::X20)),
+            0xF7 => Some(Instruction::RST(RSTLocation::X30)),
 
             0x08 => Some(Instruction::LD(LoadType::WordFromSP)),
             0x18 => Some(Instruction::JR(JumpTest::Always)),
@@ -664,10 +692,10 @@ impl Instruction {
             0x9F => Some(Instruction::SBC(ArithmeticTarget::A)),
             0xAF => Some(Instruction::XOR(ArithmeticTarget::A)),
             0xBF => Some(Instruction::CP(ArithmeticTarget::A)),
-            //0xCF =>
-            //0xDF =>
-            //0xEF =>
-            //0xFF =>
+            0xCF => Some(Instruction::RST(RSTLocation::X08)),
+            0xDF => Some(Instruction::RST(RSTLocation::X18)),
+            0xEF => Some(Instruction::RST(RSTLocation::X28)),
+            0xFF => Some(Instruction::RST(RSTLocation::X38)),
 
             _ => None
         }

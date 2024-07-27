@@ -1,4 +1,5 @@
 /target
-/gb-test-roms-master
 /roms
 /logs
+/tests
+/tests_blargg
