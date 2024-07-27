@@ -19,9 +19,11 @@ use self::instructions::LoadWordTarget;
 use self::instructions::Indirect;
 use self::instructions::StackTarget;
 
-pub const VBLANK_ADD: u16 = 0x40;
-pub const LCDSTAT_ADD: u16 = 0x48;
-pub const TIMER_ADD: u16 = 0x50;
+pub const VBLANK: u16 = 0x40;
+pub const STAT: u16 = 0x48;
+pub const TIMER: u16 = 0x50;
+pub const SERIAL: u16 = 0x58;
+pub const JOYPAD: u16 = 0x60;
 
 pub struct CPU { 
     pub registers: Registers,
@@ -30,7 +32,7 @@ pub struct CPU {
     pub bus: MemoryBus,
     pub is_halted: bool,
     pub is_booted: bool,
-    pub interrupt_enabled: bool
+    pub ime: bool
 }
 
 impl CPU {
@@ -42,7 +44,7 @@ impl CPU {
             bus: MemoryBus::new(boot_rom, game_rom),
             is_halted: false,
             is_booted: false,
-            interrupt_enabled: true
+            ime: true
         }
     }
 
@@ -63,39 +65,49 @@ impl CPU {
             panic!("Unkown instruction found: {} at 0x{:4x}", description, self.pc);
         };
         
-        self.bus.step(cycles, self.pc);
+        self.bus.step(cycles);
         if !self.is_halted { self.pc = next_pc; }
         if self.bus.interrupted() { self.is_halted = false; }
 
         let mut interrupted = false;
-        if self.interrupt_enabled && self.bus.interrupted() {
+        if self.ime && self.bus.interrupted() {
             if self.bus.interrupt_enable.vblank && self.bus.interrupt_flag.vblank {
                 interrupted = true;
                 self.bus.interrupt_flag.vblank = false;
-                self.interrupt(VBLANK_ADD)
+                self.interrupt(VBLANK)
             }
-            if self.bus.interrupt_enable.lcd && self.bus.interrupt_flag.lcd {
+            if self.bus.interrupt_enable.stat && self.bus.interrupt_flag.stat {
                 interrupted = true;
-                self.bus.interrupt_flag.lcd = false;
-                self.interrupt(LCDSTAT_ADD)
+                self.bus.interrupt_flag.stat = false;
+                self.interrupt(STAT)
             }
             if self.bus.interrupt_enable.timer && self.bus.interrupt_flag.timer {
                 interrupted = true;
                 self.bus.interrupt_flag.timer = false;
-                self.interrupt(TIMER_ADD)
+                self.interrupt(TIMER)
+            }
+            if self.bus.interrupt_enable.serial && self.bus.interrupt_flag.serial {
+                interrupted = true;
+                self.bus.interrupt_flag.serial = false;
+                self.interrupt(SERIAL)
+            }
+            if self.bus.interrupt_enable.joypad && self.bus.interrupt_flag.joypad {
+                interrupted = true;
+                self.bus.interrupt_flag.joypad = false;
+                self.interrupt(JOYPAD)
             }
         }
 
-        if interrupted { cycles += 12 }
+        if interrupted { cycles += 20 }
 
         cycles
     }
 
     fn interrupt(&mut self, location: u16) {
-        self.interrupt_enabled = false;
+        self.ime = false;
         self.push(self.pc);
         self.pc = location;
-        self.bus.step(12, 0x00);
+        self.bus.step(20);
     }
 
     fn push(&mut self, value: u16) {
@@ -1607,11 +1619,11 @@ impl CPU {
                 (self.pc.wrapping_add(1), 12)
             }
             Instruction::DI => {
-                self.interrupt_enabled = false;
+                self.ime = false;
                 (self.pc.wrapping_add(1), 4)
             }
             Instruction::EI => {
-                self.interrupt_enabled = true;
+                self.ime = true;
                 (self.pc.wrapping_add(1), 4)
             }
             Instruction::DAA => {
@@ -1635,6 +1647,10 @@ impl CPU {
             Instruction::RST(target) => {
                 self.push(self.pc.wrapping_add(1));
                 (target.to_hex(), 16)
+            }
+            Instruction::RETI => {
+                let new_pc = self.pop();
+                (new_pc, 4)
             }
     }
   }

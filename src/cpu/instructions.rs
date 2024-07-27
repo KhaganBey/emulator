@@ -57,7 +57,8 @@ pub enum Instruction {
     HALT,
     NOP,
     DI,
-    EI
+    EI,
+    RETI
 }
 #[derive(Debug)]
 pub enum ArithmeticTarget {
@@ -599,7 +600,7 @@ impl Instruction {
             0xA9 => Some(Instruction::XOR(ArithmeticTarget::C)),
             0xB9 => Some(Instruction::CP(ArithmeticTarget::C)),
             0xC9 => Some(Instruction::RET(JumpTest::Always)),
-            //0xD9 =>
+            0xD9 => Some(Instruction::RETI),
             0xE9 => Some(Instruction::JPI),
             0xF9 => Some(Instruction::LD(LoadType::SPFromHL)), 
 

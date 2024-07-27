@@ -22,12 +22,12 @@ enum Mode {
 
 // Blargg CPU Tests
 // 1: passes
-// 2: fail => Implement clock and proper interruptions
+// 2: fail => Implement clock and proper interruption handling
 // 3: passes
 // 4: passes
 // 5: passes
 // 6: passes
-// 7: fail => Implement proper interruptions for 0xD9 RETI
+// 7: passes
 // 8: passes
 // 9: passes
 // 10: passes
@@ -37,7 +37,7 @@ fn main() {
     let mode = Mode::Main;
 
     let boot_rom_path = "./roms/dmg_boot.bin";
-    let test_rom_path = "./tests_blargg/cpu_instrs/individual/01-special.gb";
+    let test_rom_path = "./tests_blargg/cpu_instrs/individual/02-interrupts.gb";
 
     let boot_rom = read_rom(boot_rom_path);
     let game_rom = read_rom(test_rom_path);
@@ -85,7 +85,7 @@ fn main() {
         // Change log path to ensure your old logs don't get overwritten
         Mode::Debug => {
             let mut _cpu = cpu::CPU::new(boot_rom, game_rom);
-            let mut file = std::fs::File::create("./logs/log_9.txt").expect("error creating file");
+            let mut file = std::fs::File::create("./logs/log_7.txt").expect("error creating file");
 
             loop {
                 if _cpu.pc >= 0x100 && _cpu.is_booted == false {

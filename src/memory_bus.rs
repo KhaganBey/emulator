@@ -46,6 +46,7 @@ pub const ZERO_PAGE_SIZE: usize = ZERO_PAGE_END - ZERO_PAGE_BEGIN + 1;
 pub const INTERRUPT_ENABLE_REGISTER: usize = 0xFFFF;
 
 pub struct MemoryBus {
+    is_boot_rom_mapped: bool,
     boot_rom: [u8; BOOT_ROM_SIZE],
     rom_bank_0: [u8; ROM_BANK_0_SIZE],
     rom_bank_n: [u8; ROM_BANK_N_SIZE],
@@ -81,6 +82,7 @@ impl MemoryBus {
         io_temp[0xff44 - IO_REGISTERS_BEGIN] = 0x90;
 
         MemoryBus {
+            is_boot_rom_mapped: true,
             boot_rom,
             rom_bank_0,
             rom_bank_n,
@@ -95,13 +97,13 @@ impl MemoryBus {
         }
     }
 
-    pub fn step(&mut self, cycles: u8, pc: u16) {
+    pub fn step(&mut self, cycles: u8) {
         //
     }
 
     pub fn interrupted(&self) -> bool {
         (self.interrupt_enable.vblank && self.interrupt_flag.vblank) ||
-        (self.interrupt_enable.lcd && self.interrupt_flag.lcd) ||
+        (self.interrupt_enable.stat && self.interrupt_flag.stat) ||
         (self.interrupt_enable.timer && self.interrupt_flag.timer) ||
         (self.interrupt_enable.serial && self.interrupt_flag.serial) ||
         (self.interrupt_enable.joypad && self.interrupt_flag.joypad) 
@@ -109,11 +111,10 @@ impl MemoryBus {
 
     pub fn read_byte(&self, address: u16) -> u8 {
         let address = address as usize;
-
         match address {
             BOOT_ROM_BEGIN ..= BOOT_ROM_END => {
-                if let Some(boot_rom) = Some(self.boot_rom) {
-                    boot_rom[address]
+                if self.is_boot_rom_mapped {
+                    self.boot_rom[address]
                 } else {
                     self.rom_bank_0[address]
                 }
@@ -135,7 +136,7 @@ impl MemoryBus {
 
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         let address = address as usize;
-        
+
         match address {
             ROM_BANK_0_BEGIN ..= ROM_BANK_0_END => {
                 self.rom_bank_0[address] = byte;
@@ -197,6 +198,7 @@ impl MemoryBus {
             //0xFF40 => { /* LCD Control */ }
             //0xFF42 => { /* Viewport Y Offset */ }
             //0xFF47 => { /* Background Colors Setting */ }
+            0xFF50 => { self.is_boot_rom_mapped = false; }
             0xFF7F => { /* Nothing */ }
             _ => {
                 self.io_temp[address - IO_REGISTERS_BEGIN] = byte;
