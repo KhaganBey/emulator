@@ -3,7 +3,8 @@ pub struct InterruptFlag {
     pub stat: bool,
     pub timer: bool,
     pub serial: bool,
-    pub joypad: bool
+    pub joypad: bool,
+    rest: u8
 }
 
 impl InterruptFlag {
@@ -13,7 +14,8 @@ impl InterruptFlag {
             stat: false,
             timer: false,
             serial: false,
-            joypad: false
+            joypad: false,
+            rest: 0xF0
         }
     }
 
@@ -23,10 +25,11 @@ impl InterruptFlag {
         self.timer = (byte & 0b00000100) != 0;
         self.serial = (byte & 0b00001000) != 0;
         self.joypad = (byte & 0b00010000) != 0;
+        self.rest = byte & 0xF0;
     } 
 
     pub fn to_byte(&self) -> u8 {
-        0b11110000 |
+        self.rest |
         ((self.joypad as u8) << 4) |
         ((self.serial as u8) << 3) |
         ((self.timer as u8) << 2) |

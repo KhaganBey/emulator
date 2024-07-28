@@ -1,5 +1,6 @@
 use crate::gpu::GPU;
 use crate::interrupt_flag::InterruptFlag;
+use crate::timer::Timer;
 
 pub const BOOT_ROM_BEGIN: usize = 0x00;
 pub const BOOT_ROM_END: usize = 0xFF;
@@ -57,7 +58,8 @@ pub struct MemoryBus {
     oam_temp: [u8; OAM_SIZE],
     pub interrupt_flag: InterruptFlag,
     pub interrupt_enable: InterruptFlag,
-    gpu: GPU
+    gpu: GPU,
+    pub timer: Timer
 }
 
 impl MemoryBus {
@@ -81,6 +83,12 @@ impl MemoryBus {
         let mut io_temp = [0; IO_REGISTERS_SIZE];
         io_temp[0xff44 - IO_REGISTERS_BEGIN] = 0x90;
 
+        
+        let interrupt_flag = InterruptFlag::new();
+        let interrupt_enable = InterruptFlag::new();
+
+        let timer = Timer::new();
+
         MemoryBus {
             is_boot_rom_mapped: true,
             boot_rom,
@@ -91,9 +99,10 @@ impl MemoryBus {
             zero_page: [0; ZERO_PAGE_SIZE],
             io_temp,
             oam_temp: [0; OAM_SIZE],
-            interrupt_flag: InterruptFlag::new(),
-            interrupt_enable: InterruptFlag::new(),
-            gpu: GPU::new()
+            interrupt_flag,
+            interrupt_enable,
+            gpu: GPU::new(),
+            timer
         }
     }
 
@@ -174,6 +183,10 @@ impl MemoryBus {
             //0xFF00 => { /* joypad */ 0 }
             //0xFF01 => { /* Serial Transfer */ 0 }
             //0xFF02 => { /* Serial Transfer Control */ 0 }
+            0xFF04 => self.timer.read_div(),
+            0xFF05 => self.timer.tima,
+            0xFF06 => self.timer.tma,
+            0xFF07 => self.timer.tac,
             0xFF0F => self.interrupt_flag.to_byte(),
             //0xFF40 => { /* LCD Control */ 0 }
             //0xFF42 => { /* Scroll Y Position */ 0 }
@@ -189,6 +202,10 @@ impl MemoryBus {
             0xFF00 => { /* joypad */ print!("{}", byte as char); }
             0xFF01 => { /* Serial Transfer */ print!("{}", byte as char); }
             0xFF02 => { /* Serial Transfer Control */ }
+            0xFF04 => self.timer.write_div(byte),
+            0xFF05 => self.timer.write_tima(byte),
+            0xFF06 => self.timer.write_tma(byte),
+            0xFF07 => { self.timer.tac = byte; }
             0xFF0F => self.interrupt_flag.from_byte(byte),
             //0xFF11 => { /* Channel 1 Sound Length and Wave */ }
             //0xFF12 => { /* Channel 1 Sound Control */ }
@@ -205,4 +222,8 @@ impl MemoryBus {
             }
         }
     } 
+
+    pub fn request_timer_interrupt(&mut self) {
+        self.interrupt_flag.timer = true;
+    }
 }

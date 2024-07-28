@@ -1,65 +1,57 @@
-use crate::cpu::CPU;
-
 pub struct Timer {
-    pub cpu: CPU,
     div: u16,
-    tima: u8,
-    tma: u8,
-    tac: u8,
+    pub tima: u8,
+    pub tma: u8,
+    pub tac: u8,
     edge: u8,
     tima_overflow: bool,
-    overflow_cycle: TCycle,
+    overflow_cycle: u8,
     new_tima: u8,
     new_tma: u8
 }
 
-enum TCycle {
-    ZERO,
-    ONE,
-    TWO,
-    THREE
-}
-
 impl Timer {
-    pub fn new(cpu: CPU) -> Timer {
+    pub fn new() -> Timer {
         Timer {
-            cpu: cpu,
             div: 0,
             tima: 0,
             tma: 0,
             tac: 0,
             edge: 0,
             tima_overflow: false,
-            overflow_cycle: TCycle::ZERO,
+            overflow_cycle: 0,
             new_tima: 0,
             new_tma: 0
         }
     }
 
-    pub fn ticks(&mut self, cycles: u8) {
+    pub fn ticks(&mut self, cycles: u8) -> bool {
+        let mut timer_interrupt = false;
+
         for i in 0..cycles {
-            self.tick();
+            timer_interrupt = timer_interrupt | self.tick();
         }
+    
+        timer_interrupt
     }
 
-    fn tick(&mut self) {
+    pub fn tick(&mut self) -> bool {
         // Increment div register
+        let mut timer_interrupt = false;
         self.div = self.div.wrapping_add(1);
         if self.new_tma != 0 { self.new_tma = 0; }
 
         // Check for overflow
-        self.overflow_cycle = match self.overflow_cycle {
-            TCycle::ZERO => {
-                if self.tima_overflow {
+        if self.tima_overflow {
+                if self.overflow_cycle == 4 {
                     self.tima = self.tma;
                     if self.new_tima != 0 { self.new_tima = 0; }
-                    self.cpu.bus.interrupt_flag.timer = true;
+                    timer_interrupt = true;
+                    self.overflow_cycle = 0;
+                } else {
+                    self.overflow_cycle += 1;
                 }
-
-                self.get_next_t()
-            }
-            _ => { self.get_next_t() } 
-        };
+        }
 
         // Get the and_result
         let tac_lower = self.tac & 0b00000011;
@@ -78,9 +70,12 @@ impl Timer {
 
         // Check for falling edge
         if self.edge == 1 && and_result == 0 {
-            let (new_value, did_overflow) = self.tima.overflowing_add(1);
-            self.tima_overflow = did_overflow;
-            self.overflow_cycle = TCycle::ONE;
+            if self.tima == 0xFF {
+                self.tima_overflow = true;
+                self.overflow_cycle = 1;
+            } else {
+                self.tima += 1;
+            }
         } 
         self.edge = and_result;
 
@@ -89,22 +84,14 @@ impl Timer {
             self.new_tima = 0;
          }
 
-    }
-
-    pub fn get_next_t(&self) -> TCycle {
-        match self.overflow_cycle {
-            TCycle::ZERO => TCycle::ONE,
-            TCycle::ONE => TCycle::TWO,
-            TCycle::TWO => TCycle::THREE,
-            TCycle::THREE =>TCycle::ZERO
-        }
+         timer_interrupt
     }
 
     pub fn read_div(&self) -> u8 {
         ((self.div & 0b11110000) >> 8) as u8
     }
 
-    pub fn write_div(&mut self) {
+    pub fn write_div(&mut self, byte: u8) {
         self.div = 0;
     }
     

@@ -50,24 +50,37 @@ impl CPU {
 
 
     pub fn step(&mut self) -> u8 {
-        let mut instruction_byte = self.bus.read_byte(self.pc);
-        
-        let prefixed = instruction_byte == 0xCB;
-        if prefixed {
-            let previous = instruction_byte;
-            instruction_byte = self.bus.read_byte(self.pc + 1);
+        let mut next_pc = self.pc;
+        let mut cycles = 0;
+
+        if !self.is_halted {
+            let mut instruction_byte = self.bus.read_byte(self.pc);
+            
+            let prefixed = instruction_byte == 0xCB;
+            if prefixed {
+                let previous = instruction_byte;
+                instruction_byte = self.bus.read_byte(self.pc + 1);
+            }
+                
+            (next_pc, cycles) = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
+                self.execute(instruction)
+            } else {
+                let description = format!("0x{}{:2x}", if prefixed { "cb" } else { "" }, instruction_byte);
+                panic!("Unkown instruction found: {} at 0x{:4x}", description, self.pc);
+            };
         }
         
-        let (next_pc, mut cycles) = if let Some(instruction) = Instruction::from_byte(instruction_byte, prefixed) {
-            self.execute(instruction)
-        } else {
-            let description = format!("0x{}{:2x}", if prefixed { "cb" } else { "" }, instruction_byte);
-            panic!("Unkown instruction found: {} at 0x{:4x}", description, self.pc);
-        };
-        
         self.bus.step(cycles);
-        if !self.is_halted { self.pc = next_pc; }
+        
         if self.bus.interrupted() { self.is_halted = false; }
+
+        if self.is_halted { 
+            let timer_interrupt = self.bus.timer.tick();
+                if timer_interrupt {
+                    self.bus.request_timer_interrupt();
+                }
+        }
+        self.pc = next_pc;
 
         let mut interrupted = false;
         if self.ime && self.bus.interrupted() {
@@ -83,6 +96,7 @@ impl CPU {
             }
             if self.bus.interrupt_enable.timer && self.bus.interrupt_flag.timer {
                 interrupted = true;
+                println!("timer int!");
                 self.bus.interrupt_flag.timer = false;
                 self.interrupt(TIMER)
             }
