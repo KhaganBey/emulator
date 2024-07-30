@@ -25,70 +25,82 @@ impl Timer {
         }
     }
 
-    pub fn ticks(&mut self, cycles: u8) -> bool {
-        let mut timer_interrupt = false;
+    pub fn m_tick(&mut self) -> (bool, u8) {
+        let mut cycles_left = 4;
 
-        for i in 0..cycles {
-            timer_interrupt = timer_interrupt | self.tick();
+        while cycles_left > 0 {
+            if self.tick() {
+                cycles_left -= 1;
+                return (true, cycles_left)
+            }
+            
+            cycles_left -= 1;
         }
     
-        timer_interrupt
+        (false, cycles_left)
     }
 
     pub fn tick(&mut self) -> bool {
-        // Increment div register
         let mut timer_interrupt = false;
+
+        // Handle writes
+        self.tma = self.new_tma;
+        self.new_tma = 0;
+        if self.new_tima != 0 {
+            if self.tima_overflow && self.overflow_cycle != 4 {
+                self.tima_overflow = false;
+                self.overflow_cycle = 0;
+                self.tima = self.new_tima; 
+            }
+            self.new_tima = 0;
+        }
+
+        // Increment div register
         self.div = self.div.wrapping_add(1);
-        if self.new_tma != 0 { self.new_tma = 0; }
 
         // Check for overflow
         if self.tima_overflow {
-                if self.overflow_cycle == 4 {
-                    self.tima = self.tma;
-                    if self.new_tima != 0 { self.new_tima = 0; }
-                    timer_interrupt = true;
-                    self.overflow_cycle = 0;
-                } else {
-                    self.overflow_cycle += 1;
-                }
+            if self.overflow_cycle == 4 {
+                self.tima = self.tma;
+                timer_interrupt = true;
+                self.overflow_cycle = 0;
+                self.tima_overflow = false;
+            } else {
+                self.overflow_cycle += 1;
+            }
         }
 
         // Get the and_result
-        let tac_lower = self.tac & 0b00000011;
+        let tac_lower: u8 = self.tac & 0b00000011;
         let bit_pos: u8 = match tac_lower {
             0b00 => 9,
             0b01 => 3,
             0b10 => 5,
             0b11 => 7,
-            _ => 0
+            _ => panic!("Invalid timer frequency!")
         };
         let div_bit: u8 = ((self.div & (0b0000000000000001 << bit_pos)) >> bit_pos) as u8;
         let timer_enable: u8 = (self.tac & 0b00000100) >> 2;
 
-        let and_result = div_bit & timer_enable;
-
+        let and_result: u8 = div_bit & timer_enable;
 
         // Check for falling edge
         if self.edge == 1 && and_result == 0 {
-            if self.tima == 0xFF {
+            if self.tima == 0xFF && self.tima_overflow == false {
                 self.tima_overflow = true;
                 self.overflow_cycle = 1;
+                self.tima = 0;
             } else {
-                self.tima += 1;
+                self.tima = self.tima + 1;
             }
         } 
         self.edge = and_result;
 
-        if self.new_tima != 0 { 
-            self.tima = self.new_tima;
-            self.new_tima = 0;
-         }
-
-         timer_interrupt
+        timer_interrupt
     }
 
     pub fn read_div(&self) -> u8 {
-        ((self.div & 0b11110000) >> 8) as u8
+        ((self.div & 0b1111111100000000) >> 8) as u8
     }
 
     pub fn write_div(&mut self, byte: u8) {
@@ -96,8 +108,11 @@ impl Timer {
     }
     
     pub fn write_tima(&mut self, new_value: u8) {
-        self.tima_overflow = false;
-        self.new_tima = new_value;
+        self.new_tima = new_value; 
+        if self.overflow_cycle != 4 {
+            self.tima_overflow = false;
+            self.tima = new_value; 
+        }
     }
 
     pub fn write_tma(&mut self, new_value: u8) {

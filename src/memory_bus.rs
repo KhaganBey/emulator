@@ -201,7 +201,7 @@ impl MemoryBus {
         match address {
             0xFF00 => { /* joypad */ print!("{}", byte as char); }
             0xFF01 => { /* Serial Transfer */ print!("{}", byte as char); }
-            0xFF02 => { /* Serial Transfer Control */ }
+            0xFF02 => { /* Serial Transfer Control */ print!("{}", byte as char); }
             0xFF04 => self.timer.write_div(byte),
             0xFF05 => self.timer.write_tima(byte),
             0xFF06 => self.timer.write_tma(byte),
@@ -214,6 +214,7 @@ impl MemoryBus {
             //0xFF26 => { /* Sound on/off */ }
             //0xFF40 => { /* LCD Control */ }
             //0xFF42 => { /* Viewport Y Offset */ }
+            //0xFF44 => {  }
             //0xFF47 => { /* Background Colors Setting */ }
             0xFF50 => { self.is_boot_rom_mapped = false; }
             0xFF7F => { /* Nothing */ }

@@ -4,16 +4,11 @@
 use std::io::Read;
 use std::io::Write;
 
-use json::JsonValue;
-
 mod cpu;
 mod gpu;
 mod memory_bus;
 mod interrupt_flag;
 mod timer;
-
-//use cpu::instructions::Instruction;
-//use cpu::flags_register::FlagsRegister;
 
 enum Mode { 
     Main,
@@ -21,31 +16,16 @@ enum Mode {
     Debug
 }
 
-// Blargg CPU Tests
-// 1: passes
-// 2: passes
-// 3: passes
-// 4: passes
-// 5: passes
-// 6: passes
-// 7: passes
-// 8: passes
-// 9: passes
-// 10: passes
-// 11: passes
-
 fn main() {
     let mode = Mode::Main;
 
     let boot_rom_path = "./roms/dmg_boot.bin";
-    let test_rom_path = "./tests_blargg/cpu_instrs/individual/02-interrupts.gb";
+    let test_rom_path = "./tests_blargg/instr_timing/instr_timing.gb";
 
     let boot_rom = read_rom(boot_rom_path);
     let game_rom = read_rom(test_rom_path);
 
     println!("ok!");
-
-    let mut cycles : u8 = 0;
     
     match mode {
         Mode::Boot =>{
@@ -60,10 +40,31 @@ fn main() {
                     std::process::exit(0)
                 }
 
-                cycles = _cpu.step();
-                let timer_interrupt = _cpu.bus.timer.ticks(cycles);
-                if timer_interrupt {
-                    _cpu.bus.request_timer_interrupt();
+                let mut cycles = _cpu.step();
+                if cycles != 4 { panic!("Unhandled CPU cycle detected.") }
+
+                while cycles > 0 {
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        //println!("Requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        //println!("Requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        //println!("Requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        //println!("Requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    cycles = 0;
                 }
             }
         }
@@ -80,10 +81,33 @@ fn main() {
                     println!("");
                 }
             
-                cycles = _cpu.step();
-                let timer_interrupt = _cpu.bus.timer.ticks(cycles);
-                if timer_interrupt {
-                    _cpu.bus.request_timer_interrupt();
+                let mut cycles = _cpu.step();
+                if cycles != 4 { panic!("Unhandled CPU cycle detected.") }
+
+                while cycles > 0 {
+                    if _cpu.pc > 0xC2D2 && _cpu.pc < 0xC2CF { println!("Main:"); }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                        println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
+                    }
+
+                    cycles = 0;
                 }
             }
         }
@@ -93,7 +117,7 @@ fn main() {
         Mode::Debug => {
             let memory_bus = memory_bus::MemoryBus::new(boot_rom, game_rom);
             let mut _cpu = cpu::CPU::new(memory_bus);
-            let mut file = std::fs::File::create("./logs/log_2.txt").expect("error creating file");
+            let mut file = std::fs::File::create("./logs/log_itiming.txt").expect("error creating file");
 
             loop {
                 if _cpu.pc >= 0x100 && _cpu.is_booted == false {
@@ -104,12 +128,30 @@ fn main() {
                     //writeln!(&mut file, "A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})", _cpu.registers.a, u8::from(_cpu.registers.f), _cpu.registers.b, _cpu.registers.c, _cpu.registers.d, _cpu.registers.e, _cpu.registers.h, _cpu.registers.l, _cpu.sp, _cpu.pc, _cpu.bus.read_byte(_cpu.pc), _cpu.bus.read_byte(_cpu.pc + 1), _cpu.bus.read_byte(_cpu.pc + 2), _cpu.bus.read_byte(_cpu.pc + 3)).expect("error logging to file");
                 }
             
-                cycles = _cpu.step();
-                let timer_interrupt = _cpu.bus.timer.ticks(cycles);
-                if timer_interrupt {
-                    _cpu.bus.request_timer_interrupt();
+                let mut cycles = _cpu.step();
+                if cycles != 4 { panic!("Unhandled CPU cycle detected.") }
+
+                while cycles > 0 {
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                    }
+
+                    if _cpu.bus.timer.tick() {
+                        _cpu.bus.request_timer_interrupt();
+                    }
+
+                    cycles = 0;
                 }
-                if _cpu.is_booted { writeln!(&mut file, "A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X})", _cpu.registers.a, u8::from(_cpu.registers.f), _cpu.registers.b, _cpu.registers.c, _cpu.registers.d, _cpu.registers.e, _cpu.registers.h, _cpu.registers.l, _cpu.sp, _cpu.pc, _cpu.bus.read_byte(_cpu.pc), _cpu.bus.read_byte(_cpu.pc + 1), _cpu.bus.read_byte(_cpu.pc + 2), _cpu.bus.read_byte(_cpu.pc + 3)).expect("error logging to file"); }
+
+                if _cpu.is_booted { writeln!(&mut file, "A: {:02X} F: {:02X} B: {:02X} C: {:02X} D: {:02X} E: {:02X} H: {:02X} L: {:02X} SP: {:04X} PC: 00:{:04X} ({:02X} {:02X} {:02X} {:02X}). tima: {:08b}. if: {:08b}", _cpu.registers.a, u8::from(_cpu.registers.f), _cpu.registers.b, _cpu.registers.c, _cpu.registers.d, _cpu.registers.e, _cpu.registers.h, _cpu.registers.l, _cpu.sp, _cpu.pc, _cpu.bus.read_byte(_cpu.pc), _cpu.bus.read_byte(_cpu.pc + 1), _cpu.bus.read_byte(_cpu.pc + 2), _cpu.bus.read_byte(_cpu.pc + 3), _cpu.bus.timer.tima, _cpu.bus.interrupt_flag.to_byte()).expect("error logging to file"); }
             }
         }
     }
@@ -124,15 +166,4 @@ fn read_rom(path: &str) -> Vec<u8> {
     file.read_to_end(&mut rom).expect(&error_message);
     
     rom
-}
-
-fn read_json(path: &str) -> JsonValue {
-    let error_message: String = format!("Could not read test file at {}", path.to_string());
-    let mut file = std::fs::File::open(path).expect(&error_message);
-
-    let mut array = String::new();
-    file.read_to_string(&mut array).expect(&error_message);
-
-    let json_array = json::parse(&array).expect(&error_message);
-    json_array
 }
