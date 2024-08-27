@@ -1,3 +1,5 @@
+extern crate sdl2;
+
 use crate::memory_bus::VRAM_SIZE;
 
 #[derive(Copy,Clone)]
@@ -13,17 +15,32 @@ fn empty_tile() -> Tile {
     [[TilePixelValue::Zero; 8]; 8]
 }
 
-pub struct GPU {
+pub struct PPU {
     vram: [u8; VRAM_SIZE],
     tile_set: [Tile; 384]
 }
 
-impl GPU {
-    pub fn new() ->GPU {
-        GPU {
+impl PPU {
+    pub fn new() -> PPU {
+        let sdl_context = sdl2::init().unwrap();
+        let video_subsys = sdl_context.video().unwrap();
+
+        let window = video_subsys.window("Gameboy DMG-01", 480, 432)
+            .position_centered()
+            .resizable()
+            .build()
+            .unwrap();
+
+        let canvas = window.into_canvas().build().unwrap();
+
+        PPU {
             vram: [0; VRAM_SIZE],
             tile_set: [empty_tile(); 384]
         }
+    }
+
+    pub fn tick(&self) {
+
     }
 
     pub fn read_vram(&self, address: usize) -> u8 {
@@ -31,8 +48,7 @@ impl GPU {
     }
 
     pub fn write_vram(&mut self, address: usize, value: u8) {
-        self.vram[address] = value;
-        /*if address > 0x1800 { return }
+        if address > 0x1800 { return }
 
         let normalised_address = address & 0xFFEF;
 
@@ -55,6 +71,6 @@ impl GPU {
             };
 
             self.tile_set[tile_address][row_address][pixel_address] = value;
-        }*/
+        }
     }
 }

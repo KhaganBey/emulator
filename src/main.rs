@@ -5,7 +5,7 @@ use std::io::Read;
 use std::io::Write;
 
 mod cpu;
-mod gpu;
+mod ppu;
 mod memory_bus;
 mod interrupt_flag;
 mod timer;
@@ -91,21 +91,22 @@ fn main() {
                         _cpu.bus.request_timer_interrupt();
                         println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
                     }
-
+                    _cpu.bus.ppu.tick();
                     if _cpu.bus.timer.tick() {
                         _cpu.bus.request_timer_interrupt();
                         println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
                     }
-
+                    _cpu.bus.ppu.tick();
                     if _cpu.bus.timer.tick() {
                         _cpu.bus.request_timer_interrupt();
                         println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
                     }
-
+                    _cpu.bus.ppu.tick();
                     if _cpu.bus.timer.tick() {
                         _cpu.bus.request_timer_interrupt();
                         println!("Main requesting timer interrupt at pc 0x{:02X}", _cpu.pc);
                     }
+                    _cpu.bus.ppu.tick();
 
                     cycles = 0;
                 }

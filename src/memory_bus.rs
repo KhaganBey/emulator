@@ -1,4 +1,4 @@
-use crate::gpu::GPU;
+use crate::ppu::PPU;
 use crate::interrupt_flag::InterruptFlag;
 use crate::timer::Timer;
 
@@ -58,7 +58,7 @@ pub struct MemoryBus {
     oam_temp: [u8; OAM_SIZE],
     pub interrupt_flag: InterruptFlag,
     pub interrupt_enable: InterruptFlag,
-    gpu: GPU,
+    pub ppu: PPU,
     pub timer: Timer
 }
 
@@ -101,7 +101,7 @@ impl MemoryBus {
             oam_temp: [0; OAM_SIZE],
             interrupt_flag,
             interrupt_enable,
-            gpu: GPU::new(),
+            ppu: PPU::new(),
             timer
         }
     }
@@ -130,7 +130,7 @@ impl MemoryBus {
             }
             ROM_BANK_0_BEGIN ..= ROM_BANK_0_END => self.rom_bank_0[address],
             ROM_BANK_N_BEGIN ..= ROM_BANK_N_END => self.rom_bank_n[address - ROM_BANK_N_BEGIN],
-            VRAM_BEGIN ..= VRAM_END => { self.gpu.read_vram(address - VRAM_BEGIN) }
+            VRAM_BEGIN ..= VRAM_END => { self.ppu.read_vram(address - VRAM_BEGIN) }
             EXTERNAL_RAM_BEGIN ..= EXTERNAL_RAM_END => self.external_ram[address - EXTERNAL_RAM_BEGIN],
             WORKING_RAM_BEGIN ..= WORKING_RAM_END => self.working_ram[address - WORKING_RAM_BEGIN],
             ECHO_RAM_BEGIN ..= ECHO_RAM_END => self.working_ram[address - ECHO_RAM_BEGIN],
@@ -154,7 +154,7 @@ impl MemoryBus {
                 self.rom_bank_n[address - ROM_BANK_N_BEGIN] = byte;
             }
             VRAM_BEGIN ..= VRAM_END => {
-                self.gpu.write_vram(address - VRAM_BEGIN, byte)
+                self.ppu.write_vram(address - VRAM_BEGIN, byte)
             }
             EXTERNAL_RAM_BEGIN ..= EXTERNAL_RAM_END => {
                 self.external_ram[address - EXTERNAL_RAM_BEGIN] = byte;
